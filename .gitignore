@@ -1,39 +1,23 @@
-# 虚拟环境
-.venv/
-venv/
-env/
-ENV/
-
-# VSCode 配置
-.vscode/
-*.code-workspace
-.vscode/settings.json
-.vscode/extensions.json
-*.log
-
-# Python 缓存文件
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.egg-info/
-dist/
-build/
-*.whl
-
-# 系统临时文件
-.DS_Store
-Thumbs.db
-
-# 数据文件夹（如果A分类、A推荐里存放数据集/输出文件，取消下面两行注释）
+# 数据文件
+A分类.zip
+A推荐.zip
 A分类/
 A推荐/
 
-# 日志、输出缓存
-*.out
-*.txt
-*.csv
-*.xlsx
-*.png
-*.jpg
-*.pdf
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# 临时文件
+*.tmp
+*.log
+fix.py

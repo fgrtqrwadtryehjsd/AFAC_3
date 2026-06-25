@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import numpy as np
 from openai import OpenAI
@@ -146,7 +147,7 @@ class AFACAgent:
         print(f"\\n最优配置为 Round {best['round']}，分数为 {best['score']:.4f}")
 
 if __name__ == '__main__':
-    API_KEY = 'sk-ws-H.RPMYXLE.IVuv.MEUCIHpKgKle8C148rMkekleMZSeUM1r7LtCI8NUSuOw2vxAAiEAoFswwUheWNfyKg0zhbDD5uSI5EwLINkoWjVdQslwaAQ' # 用户实际 KEY 在环境变量或外部传入
+    API_KEY = os.environ.get('DASHSCOPE_API_KEY', '')  # 从环境变量获取 API KEY
     # 执行分类任务验证
     agent_cls = AFACAgent(api_key=API_KEY, task_type="classification", budget=3)
     agent_cls.run()
