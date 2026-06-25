@@ -5,6 +5,7 @@
     {
       "round": 1,
       "config": {
+        "side_features": "user_features",
         "embedding_dim": 64,
         "hidden_dim": 128,
         "num_layers": 1,
@@ -15,110 +16,172 @@
         "max_seq_len": 50,
         "batch_size": 256,
         "patience": 7,
-        "loss_type": "ce",
-        "use_seq_aug": true,
-        "strategy": "exploration",
-        "rationale": "当前为第1轮，无历史实验反馈，需构建稳健baseline。参考跨任务经验：分类任务中中等容量（hidden_dim=128 vs 256）、适度正则化（dropout=0.2 vs 0.5）、适中学习率（lr=0.001 vs 0.01）在首轮即取得高稳定性；同时测试用户平均序列仅6.25，远短于训练序列（46），故启用use_seq_aug=true——通过随机截断模拟短序列分布，提升模型对稀疏/短序的鲁棒性，这是GRU4Rec在冷启动/长尾场景的关键缓解策略；max_seq_len=50平衡了覆盖95%训练序列（均值46，std≈32，P95≈92）与显存效率，避免max_seq_len=100引入冗余padding噪声；batch_size=256兼顾梯度稳定性与吞吐；embedding_dim=64在物品数2156下提供充足表达力（log2(2156)≈11，64维留足语义空间），且优于32维的泛化瓶颈风险；num_layers=1因GRU4Rec深层易梯度消失且短序列受益有限，优先保障训练稳定性；策略定为exploration——首轮必须广域探查核心超参组合，而非过早收敛至局部配置，为后续exploitation留出空间。",
         "model_type": "gru4rec",
+        "loss_type": "bpr",
+        "use_seq_aug": true,
         "popularity_weight": 0.0,
-        "remove_seen": false
+        "remove_seen": false,
+        "n_neg": 5
       },
-      "val_ndcg10": 0.5906410307646566,
-      "loss_type": "ce",
+      "val_ndcg10": 0.4750700406281245,
+      "loss_type": "bpr",
       "popularity_weight": 0.0,
       "remove_seen": false,
-      "elapsed_seconds": 107.975900888443,
+      "use_seq_aug": true,
+      "diagnostic_report": {
+        "overall_ndcg_10": 0.4750700406281245,
+        "subgroup_metrics": {
+          "cold_start_users_ndcg (seq_len<5)": 0.4120612677447114,
+          "warm_users_ndcg (seq_len>15)": 0.4904318993075225,
+          "cold_start_count": 869,
+          "warm_count": 2539,
+          "head_items_recall": 0.6175,
+          "tail_items_recall": 0
+        },
+        "system_metrics": {
+          "training_time_seconds": 144.37862515449524
+        }
+      },
+      "elapsed_seconds": 144.37862515449524,
       "model_type": "gru4rec",
-      "feedback": "验证NDCG@10=0.5906, 损失类型=ce, 流行度权重=0.0",
-      "rationale": "当前为第1轮，无历史实验反馈，需构建稳健baseline。参考跨任务经验：分类任务中中等容量（hidden_dim=128 vs 256）、适度正则化（dropout=0.2 vs 0.5）、适中学习率（lr=0.001 vs 0.01）在首轮即取得高稳定性；同时测试用户平均序列仅6.25，远短于训练序列（46），故启用use_seq_aug=true——通过随机截断模拟短序列分布，提升模型对稀疏/短序的鲁棒性，这是GRU4Rec在冷启动/长尾场景的关键缓解策略；max_seq_len=50平衡了覆盖95%训练序列（均值46，std≈32，P95≈92）与显存效率，避免max_seq_len=100引入冗余padding噪声；batch_size=256兼顾梯度稳定性与吞吐；embedding_dim=64在物品数2156下提供充足表达力（log2(2156)≈11，64维留足语义空间），且优于32维的泛化瓶颈风险；num_layers=1因GRU4Rec深层易梯度消失且短序列受益有限，优先保障训练稳定性；策略定为exploration——首轮必须广域探查核心超参组合，而非过早收敛至局部配置，为后续exploitation留出空间。",
-      "strategy": "exploration"
+      "feedback": "验证NDCG@10=0.4751, 损失=bpr, 冷启动NDCG=0.4121, 耗时=144.4s",
+      "rationale": "首轮实验无历史指标，但任务描述明确揭示核心瓶颈：测试用户平均序列长度仅6.25（其中大量冷启动用户seq_len<5），而训练用户平均长度达46，存在严重训练-测试分布偏移。GRU4Rec对短序列建模能力弱，易受初始状态偏差影响；random_trunc虽可增强多样性，但对极短序列（如长度≤3）几乎无增益，反而可能破坏已有稀疏信号。相比而言，sliding_window能为短序列生成多个合理子序列（如len=4→滑动步长1、窗口=3可得2个样本），显著提升冷启动用户的数据密度与梯度稳定性；同时，引入user_features（如人口统计、设备、活跃时段等）可缓解纯行为序列缺失问题，是冷启动场景最直接有效的side information。cross_entropy损失在短序列下易受负采样偏差干扰，bpr更适配pairwise排序目标，但首轮应优先解决数据表征瓶颈而非损失函数。因此，本轮应聚焦'数据增强+特征补全'双路径：用sliding_window修复短序列样本匮乏，用user_features锚定用户固有偏好。",
+      "strategy": "exploration",
+      "conclusion": ""
     },
     {
       "round": 2,
       "config": {
-        "embedding_dim": 128,
-        "hidden_dim": 256,
+        "side_features": "none",
+        "embedding_dim": 64,
+        "hidden_dim": 128,
         "num_layers": 2,
         "dropout": 0.3,
-        "lr": 0.0005,
-        "weight_decay": 0.0001,
-        "epochs": 80,
-        "max_seq_len": 100,
-        "batch_size": 128,
-        "patience": 10,
-        "loss_type": "ce",
+        "lr": 0.001,
+        "weight_decay": 0,
+        "epochs": 50,
+        "max_seq_len": 50,
+        "batch_size": 256,
+        "patience": 7,
+        "model_type": "sasrec",
+        "loss_type": "cross_entropy",
         "use_seq_aug": true,
-        "strategy": "exploration",
-        "rationale": "第1轮 baseline（NDCG@10=0.5906）验证了基础配置的稳健性，但存在明确提升空间：测试序列极短（均值6.25），而当前 max_seq_len=50 可能过度截断长尾训练序列（P95≈92），限制模型学习长程依赖；同时 GRU4Rec 在深层+高维下常受限于梯度传播而非表达力——跨任务经验中分类任务在 hidden_dim=256/num_layers=2/dropout=0.5 时达到最优，虽其 dropout 更高（0.5 vs 0.2），但本任务因序列稀疏、标签噪声更高，需更保守的正则化（故取 dropout=0.3 而非 0.5）；embedding_dim 提升至 128 可缓解物品数 2156 下的语义坍缩风险（尤其对低频物品），且与 hidden_dim=256 匹配更利于信息流动；lr 降至 0.0005 配合 epochs=80 和 patience=10，可避免早停于次优收敛点（首轮 50 epoch 可能未达稳定）；batch_size 降为 128 增强梯度多样性，对短序列建模更鲁棒（小批量更易捕捉个体用户行为突变）；weight_decay=0.0001 引入轻量 L2 正则，防止高维 embedding 过拟合稀疏交互；use_seq_aug 保持 true —— 短序列鲁棒性仍是核心瓶颈，增强策略已验证有效；策略仍为 exploration：剩余预算仅 2 次，需快速探明容量扩展方向（维度/层数/长度）是否带来增益，而非过早微调。此配置系统性扩大模型容量与序列感知能力，直击‘训练长序列 vs 测试短序列’的分布偏移本质。",
-        "model_type": "gru4rec",
         "popularity_weight": 0.0,
-        "remove_seen": false
+        "remove_seen": false,
+        "n_neg": 5
       },
-      "val_ndcg10": 0.591079301927473,
-      "loss_type": "ce",
+      "val_ndcg10": 0.592637306221314,
+      "loss_type": "cross_entropy",
       "popularity_weight": 0.0,
       "remove_seen": false,
-      "elapsed_seconds": 276.18370485305786,
-      "model_type": "gru4rec",
-      "feedback": "验证NDCG@10=0.5911, 损失类型=ce, 流行度权重=0.0",
-      "rationale": "第1轮 baseline（NDCG@10=0.5906）验证了基础配置的稳健性，但存在明确提升空间：测试序列极短（均值6.25），而当前 max_seq_len=50 可能过度截断长尾训练序列（P95≈92），限制模型学习长程依赖；同时 GRU4Rec 在深层+高维下常受限于梯度传播而非表达力——跨任务经验中分类任务在 hidden_dim=256/num_layers=2/dropout=0.5 时达到最优，虽其 dropout 更高（0.5 vs 0.2），但本任务因序列稀疏、标签噪声更高，需更保守的正则化（故取 dropout=0.3 而非 0.5）；embedding_dim 提升至 128 可缓解物品数 2156 下的语义坍缩风险（尤其对低频物品），且与 hidden_dim=256 匹配更利于信息流动；lr 降至 0.0005 配合 epochs=80 和 patience=10，可避免早停于次优收敛点（首轮 50 epoch 可能未达稳定）；batch_size 降为 128 增强梯度多样性，对短序列建模更鲁棒（小批量更易捕捉个体用户行为突变）；weight_decay=0.0001 引入轻量 L2 正则，防止高维 embedding 过拟合稀疏交互；use_seq_aug 保持 true —— 短序列鲁棒性仍是核心瓶颈，增强策略已验证有效；策略仍为 exploration：剩余预算仅 2 次，需快速探明容量扩展方向（维度/层数/长度）是否带来增益，而非过早微调。此配置系统性扩大模型容量与序列感知能力，直击‘训练长序列 vs 测试短序列’的分布偏移本质。",
-      "strategy": "exploration"
+      "use_seq_aug": true,
+      "diagnostic_report": {
+        "overall_ndcg_10": 0.592637306221314,
+        "subgroup_metrics": {
+          "cold_start_users_ndcg (seq_len<5)": 0.5788967684476852,
+          "warm_users_ndcg (seq_len>15)": 0.5932048178616682,
+          "cold_start_count": 869,
+          "warm_count": 2539,
+          "head_items_recall": 0.81275,
+          "tail_items_recall": 0
+        },
+        "system_metrics": {
+          "training_time_seconds": 152.615478515625
+        }
+      },
+      "elapsed_seconds": 152.615478515625,
+      "model_type": "sasrec",
+      "feedback": "验证NDCG@10=0.5926, 损失=cross_entropy, 冷启动NDCG=0.5789, 耗时=152.6s",
+      "rationale": "诊断报告揭示核心瓶颈：冷启动用户（seq_len<5）NDCG=0.4121，显著低于整体0.4751和暖启用户0.4904，差距达0.0783；而长尾物品召回未显式报告但head_items_recall=0.6175偏高，暗示模型过度聚焦头部物品——这与短序列下GRU4Rec依赖强时序模式、难以泛化到稀疏交互的特性高度一致。首轮使用user_features虽引入辅助信息，但对冷启动用户（特征可能稀疏或无区分度）提升有限；且random_trunc在极短序列上无效（如len=3截断后更短），反而加剧信息损失。跨任务经验中dropout=0.5在分类任务中有效缓解过拟合，提示当前dropout=0.2可能不足；更重要的是，滑动_window能将短序列（如len=6）生成多个合理子序列（如[1:21], [2:22], ...），显著扩充冷启动样本多样性，直接缓解训练-测试分布偏移。因此本轮应放弃user_features（冷启用户特征有效性存疑），转向sliding_window增强，并切换为SASRec——其自注意力机制对短序列建模更鲁棒（无需递归状态传递），且天然支持位置编码补偿序列长度不足。",
+      "strategy": "exploration",
+      "conclusion": "本轮提升 0.1176, 方向有效"
     },
     {
       "round": 3,
       "config": {
+        "side_features": "none",
         "embedding_dim": 64,
         "hidden_dim": 128,
-        "num_layers": 1,
-        "dropout": 0.1,
-        "lr": 0.005,
-        "weight_decay": 5e-05,
+        "num_layers": 2,
+        "dropout": 0.3,
+        "lr": 0.001,
+        "weight_decay": 0,
         "epochs": 50,
-        "max_seq_len": 20,
-        "batch_size": 512,
+        "max_seq_len": 50,
+        "batch_size": 256,
         "patience": 7,
-        "loss_type": "ce",
-        "use_seq_aug": true,
-        "strategy": "exploitation",
-        "rationale": "两轮实验显示：从round1到round2，模型容量全面扩大（emb/hidden/layer/max_len↑, dropout↑, lr↓, batch_size↓），但NDCG仅微增0.000438（0.5906→0.5911），增幅远低于预期，且绝对提升不足0.05%，说明当前瓶颈**不在表达能力上限**，而在**短序列建模效率与优化动态匹配性**。测试序列均长仅6.25，而round2中max_seq_len=100引入大量无信息padding，稀释GRU注意力；同时hidden_dim=256+num_layers=2在短序列上易引发梯度弥散与过拟合（尤其配合dropout=0.3仍显保守）；lr=0.0005训练过慢，80 epoch未见显著收敛加速，反致早停窗口内有效更新不足。因此第3轮转向exploitation：回归baseline骨架（emb=64, hidden=128, layers=1）——该结构已在round1验证稳定且高效；关键调整聚焦短序列适配：① max_seq_len=20精准覆盖测试序列P99（6.25均值+2σ≈15~18），消除冗余padding，强制GRU聚焦真实行为片段，提升状态初始化鲁棒性；② dropout降至0.1——短序列信息稀缺，过度正则化会扼杀有限信号，0.1在保留泛化的同时最大化梯度信噪比；③ lr提升至0.005——小序列长度下梯度方差更低，更高学习率可加速收敛，配合patience=7避免震荡；④ batch_size=512增强梯度平滑性，对稀疏用户行为更具统计稳定性（对比round2的128易受单个短序噪声扰动）；⑤ weight_decay=5e-5引入极轻L2，抑制64维embedding在2156物品下的轻微过拟合倾向，无需round2的强正则；⑥ use_seq_aug=true保持——仍是应对训练-测试序列长度偏移的核心机制。综上，本轮不探索新维度，而是以‘精度导向’收缩搜索空间，在已验证稳健架构上针对短序列本质做精细化适配，属典型exploitation。",
         "model_type": "gru4rec",
+        "loss_type": "bpr",
+        "use_seq_aug": true,
         "popularity_weight": 0.0,
-        "remove_seen": false
+        "remove_seen": false,
+        "n_neg": 5
       },
-      "val_ndcg10": 0.5878457708236646,
-      "loss_type": "ce",
+      "val_ndcg10": 0.45905365653806257,
+      "loss_type": "bpr",
       "popularity_weight": 0.0,
       "remove_seen": false,
-      "elapsed_seconds": 36.80562448501587,
+      "use_seq_aug": true,
+      "diagnostic_report": {
+        "overall_ndcg_10": 0.45905365653806257,
+        "subgroup_metrics": {
+          "cold_start_users_ndcg (seq_len<5)": 0.4070308404997967,
+          "warm_users_ndcg (seq_len>15)": 0.4714050019933696,
+          "cold_start_count": 869,
+          "warm_count": 2539,
+          "head_items_recall": 0.603,
+          "tail_items_recall": 0
+        },
+        "system_metrics": {
+          "training_time_seconds": 146.78847980499268
+        }
+      },
+      "elapsed_seconds": 146.78847980499268,
       "model_type": "gru4rec",
-      "feedback": "验证NDCG@10=0.5878, 损失类型=ce, 流行度权重=0.0",
-      "rationale": "两轮实验显示：从round1到round2，模型容量全面扩大（emb/hidden/layer/max_len↑, dropout↑, lr↓, batch_size↓），但NDCG仅微增0.000438（0.5906→0.5911），增幅远低于预期，且绝对提升不足0.05%，说明当前瓶颈**不在表达能力上限**，而在**短序列建模效率与优化动态匹配性**。测试序列均长仅6.25，而round2中max_seq_len=100引入大量无信息padding，稀释GRU注意力；同时hidden_dim=256+num_layers=2在短序列上易引发梯度弥散与过拟合（尤其配合dropout=0.3仍显保守）；lr=0.0005训练过慢，80 epoch未见显著收敛加速，反致早停窗口内有效更新不足。因此第3轮转向exploitation：回归baseline骨架（emb=64, hidden=128, layers=1）——该结构已在round1验证稳定且高效；关键调整聚焦短序列适配：① max_seq_len=20精准覆盖测试序列P99（6.25均值+2σ≈15~18），消除冗余padding，强制GRU聚焦真实行为片段，提升状态初始化鲁棒性；② dropout降至0.1——短序列信息稀缺，过度正则化会扼杀有限信号，0.1在保留泛化的同时最大化梯度信噪比；③ lr提升至0.005——小序列长度下梯度方差更低，更高学习率可加速收敛，配合patience=7避免震荡；④ batch_size=512增强梯度平滑性，对稀疏用户行为更具统计稳定性（对比round2的128易受单个短序噪声扰动）；⑤ weight_decay=5e-5引入极轻L2，抑制64维embedding在2156物品下的轻微过拟合倾向，无需round2的强正则；⑥ use_seq_aug=true保持——仍是应对训练-测试序列长度偏移的核心机制。综上，本轮不探索新维度，而是以‘精度导向’收缩搜索空间，在已验证稳健架构上针对短序列本质做精细化适配，属典型exploitation。",
-      "strategy": "exploitation"
+      "feedback": "验证NDCG@10=0.4591, 损失=bpr, 冷启动NDCG=0.4070, 耗时=146.8s",
+      "rationale": "诊断报告揭示关键矛盾：第2轮已显著提升冷启动用户NDCG（0.5789 → 较第1轮+0.1668），且冷启/暖启性能差距大幅收窄（仅差0.0143），说明当前架构（GRU4Rec + no side features + deeper network）对短序列泛化能力已有实质性改善；但head_items_recall高达0.8127，远超合理基线（通常≤0.7），暗示模型过度拟合高频交互模式，牺牲长尾物品覆盖——这与任务描述中'2,156物品'和'测试序列极短'高度相关：短序列下用户意图稀疏，模型被迫依赖共现统计（即头部物品），而缺乏item side features或更鲁棒的loss无法校正该偏差。cross_entropy loss在短序列上易受正样本稀疏性影响，加剧头部偏差；bpr loss通过隐式负采样可增强长尾判别力；同时，sliding_window数据增强能为短序列生成更多局部上下文视图（如将len=4序列滑动生成[1:3],[2:4]等子序列），缓解训练-测试分布偏移，比random_trunc更适合seq_len<5场景。因此，下一轮应聚焦'长尾召回不足'这一新瓶颈，而非继续探索side_features（第1轮user_features未带来增益且增加噪声）。",
+      "strategy": "exploration",
+      "conclusion": "本轮下降 0.1336, 方向无效"
     }
   ],
   "best_result": {
     "round": 2,
     "config": {
-      "embedding_dim": 128,
-      "hidden_dim": 256,
+      "side_features": "none",
+      "embedding_dim": 64,
+      "hidden_dim": 128,
       "num_layers": 2,
       "dropout": 0.3,
-      "lr": 0.0005,
-      "weight_decay": 0.0001,
-      "epochs": 80,
-      "max_seq_len": 100,
-      "batch_size": 128,
-      "patience": 10,
-      "loss_type": "ce",
+      "lr": 0.001,
+      "weight_decay": 0,
+      "epochs": 50,
+      "max_seq_len": 50,
+      "batch_size": 256,
+      "patience": 7,
+      "model_type": "sasrec",
+      "loss_type": "cross_entropy",
       "use_seq_aug": true,
-      "strategy": "exploration",
-      "rationale": "第1轮 baseline（NDCG@10=0.5906）验证了基础配置的稳健性，但存在明确提升空间：测试序列极短（均值6.25），而当前 max_seq_len=50 可能过度截断长尾训练序列（P95≈92），限制模型学习长程依赖；同时 GRU4Rec 在深层+高维下常受限于梯度传播而非表达力——跨任务经验中分类任务在 hidden_dim=256/num_layers=2/dropout=0.5 时达到最优，虽其 dropout 更高（0.5 vs 0.2），但本任务因序列稀疏、标签噪声更高，需更保守的正则化（故取 dropout=0.3 而非 0.5）；embedding_dim 提升至 128 可缓解物品数 2156 下的语义坍缩风险（尤其对低频物品），且与 hidden_dim=256 匹配更利于信息流动；lr 降至 0.0005 配合 epochs=80 和 patience=10，可避免早停于次优收敛点（首轮 50 epoch 可能未达稳定）；batch_size 降为 128 增强梯度多样性，对短序列建模更鲁棒（小批量更易捕捉个体用户行为突变）；weight_decay=0.0001 引入轻量 L2 正则，防止高维 embedding 过拟合稀疏交互；use_seq_aug 保持 true —— 短序列鲁棒性仍是核心瓶颈，增强策略已验证有效；策略仍为 exploration：剩余预算仅 2 次，需快速探明容量扩展方向（维度/层数/长度）是否带来增益，而非过早微调。此配置系统性扩大模型容量与序列感知能力，直击‘训练长序列 vs 测试短序列’的分布偏移本质。",
-      "model_type": "gru4rec",
       "popularity_weight": 0.0,
-      "remove_seen": false
+      "remove_seen": false,
+      "n_neg": 5
     },
-    "val_ndcg": 0.591079301927473,
-    "rationale": "第1轮 baseline（NDCG@10=0.5906）验证了基础配置的稳健性，但存在明确提升空间：测试序列极短（均值6.25），而当前 max_seq_len=50 可能过度截断长尾训练序列（P95≈92），限制模型学习长程依赖；同时 GRU4Rec 在深层+高维下常受限于梯度传播而非表达力——跨任务经验中分类任务在 hidden_dim=256/num_layers=2/dropout=0.5 时达到最优，虽其 dropout 更高（0.5 vs 0.2），但本任务因序列稀疏、标签噪声更高，需更保守的正则化（故取 dropout=0.3 而非 0.5）；embedding_dim 提升至 128 可缓解物品数 2156 下的语义坍缩风险（尤其对低频物品），且与 hidden_dim=256 匹配更利于信息流动；lr 降至 0.0005 配合 epochs=80 和 patience=10，可避免早停于次优收敛点（首轮 50 epoch 可能未达稳定）；batch_size 降为 128 增强梯度多样性，对短序列建模更鲁棒（小批量更易捕捉个体用户行为突变）；weight_decay=0.0001 引入轻量 L2 正则，防止高维 embedding 过拟合稀疏交互；use_seq_aug 保持 true —— 短序列鲁棒性仍是核心瓶颈，增强策略已验证有效；策略仍为 exploration：剩余预算仅 2 次，需快速探明容量扩展方向（维度/层数/长度）是否带来增益，而非过早微调。此配置系统性扩大模型容量与序列感知能力，直击‘训练长序列 vs 测试短序列’的分布偏移本质。",
-    "strategy": "exploration"
+    "val_ndcg": 0.592637306221314,
+    "diagnostic_report": {
+      "overall_ndcg_10": 0.592637306221314,
+      "subgroup_metrics": {
+        "cold_start_users_ndcg (seq_len<5)": 0.5788967684476852,
+        "warm_users_ndcg (seq_len>15)": 0.5932048178616682,
+        "cold_start_count": 869,
+        "warm_count": 2539,
+        "head_items_recall": 0.81275,
+        "tail_items_recall": 0
+      },
+      "system_metrics": {
+        "training_time_seconds": 152.615478515625
+      }
+    },
+    "rationale": "诊断报告揭示核心瓶颈：冷启动用户（seq_len<5）NDCG=0.4121，显著低于整体0.4751和暖启用户0.4904，差距达0.0783；而长尾物品召回未显式报告但head_items_recall=0.6175偏高，暗示模型过度聚焦头部物品——这与短序列下GRU4Rec依赖强时序模式、难以泛化到稀疏交互的特性高度一致。首轮使用user_features虽引入辅助信息，但对冷启动用户（特征可能稀疏或无区分度）提升有限；且random_trunc在极短序列上无效（如len=3截断后更短），反而加剧信息损失。跨任务经验中dropout=0.5在分类任务中有效缓解过拟合，提示当前dropout=0.2可能不足；更重要的是，滑动_window能将短序列（如len=6）生成多个合理子序列（如[1:21], [2:22], ...），显著扩充冷启动样本多样性，直接缓解训练-测试分布偏移。因此本轮应放弃user_features（冷启用户特征有效性存疑），转向sliding_window增强，并切换为SASRec——其自注意力机制对短序列建模更鲁棒（无需递归状态传递），且天然支持位置编码补偿序列长度不足。",
+    "strategy": "exploration",
+    "conclusion": "本轮提升 0.1176, 方向有效"
   }
 }

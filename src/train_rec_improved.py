@@ -137,6 +137,80 @@ def compute_ndcg_at_k(test_seqs, test_targets, model, device, k=10, batch_size=2
     return float(np.mean(ndcgs))
 
 
+def compute_rec_diagnostic_report(val_seqs, val_targets, model, device,
+                                    item_popularity, elapsed, batch_size=256):
+    """计算推荐任务的多维诊断报告"""
+    model.eval()
+    k = 10
+    cold_ndcgs, warm_ndcgs = [], []
+    head_hits, tail_hits = 0, 0
+    head_total, tail_total = 0, 0
+
+    # 按流行度分头尾物品
+    pop_threshold_high = np.percentile(item_popularity[1:], 80)
+    pop_threshold_low = np.percentile(item_popularity[1:], 20)
+
+    for start in range(0, len(val_seqs), batch_size):
+        batch_seqs = val_seqs[start:start + batch_size]
+        batch_targets = val_targets[start:start + batch_size]
+        max_len = model.max_len
+
+        seq_tensors, length_tensors = [], []
+        for seq in batch_seqs:
+            if len(seq) == 0:
+                seq_padded = [0] * max_len; length = 1
+            else:
+                length = min(len(seq), max_len)
+                seq_padded = seq[-max_len:] + [0] * (max_len - len(seq[-max_len:]))
+            seq_tensors.append(seq_padded); length_tensors.append(length)
+
+        seq_batch = torch.LongTensor(seq_tensors).to(device)
+        length_batch = torch.LongTensor(length_tensors).to(device)
+
+        with torch.no_grad():
+            scores = model(seq_batch, length_batch)
+            scores[:, 0] = -1e9
+            _, topk_indices = scores.topk(k, dim=1)
+            topk_indices = topk_indices.cpu().numpy()
+
+        for i, target in enumerate(batch_targets):
+            seq_len = len(batch_seqs[i])
+            pred_list = topk_indices[i]
+            if target in pred_list:
+                rank = np.where(pred_list == target)[0][0]
+                dcg = 1.0 / np.log2(rank + 2)
+            else:
+                dcg = 0.0
+
+            if seq_len < 5:
+                cold_ndcgs.append(dcg)
+            elif seq_len > 15:
+                warm_ndcgs.append(dcg)
+
+            if item_popularity[target] >= pop_threshold_high:
+                head_total += 1
+                if target in pred_list: head_hits += 1
+            elif item_popularity[target] <= pop_threshold_low:
+                tail_total += 1
+                if target in pred_list: tail_hits += 1
+
+    report = {
+        "overall_ndcg_10": float(np.mean(cold_ndcgs + warm_ndcgs + [0])),  # 近似
+        "subgroup_metrics": {
+            "cold_start_users_ndcg (seq_len<5)": float(np.mean(cold_ndcgs)) if cold_ndcgs else 0,
+            "warm_users_ndcg (seq_len>15)": float(np.mean(warm_ndcgs)) if warm_ndcgs else 0,
+            "cold_start_count": len(cold_ndcgs),
+            "warm_count": len(warm_ndcgs),
+            "head_items_recall": float(head_hits / head_total) if head_total > 0 else 0,
+            "tail_items_recall": float(tail_hits / tail_total) if tail_total > 0 else 0,
+        },
+        "system_metrics": {
+            "training_time_seconds": float(elapsed),
+        },
+    }
+    return report
+
+
 def train_recommendation_improved(data_dir, config, output_dir, device="cuda"):
     """改进版推荐训练
 
@@ -394,6 +468,13 @@ def train_recommendation_improved(data_dir, config, output_dir, device="cuda"):
     elapsed = time.time() - start_time
     print(f"[Task2-Improved] 训练完成 | 最佳验证 NDCG@10: {best_val_ndcg:.4f} | 耗时: {elapsed:.1f}s")
 
+    # ========== 多维诊断报告 ==========
+    diagnostic_report = compute_rec_diagnostic_report(
+        val_seqs, val_targets, model, device, item_popularity, elapsed, batch_size
+    )
+    diagnostic_report["overall_ndcg_10"] = float(best_val_ndcg)
+    print(f"[诊断报告] {json.dumps(diagnostic_report, ensure_ascii=False, indent=2)}")
+
     # 生成提交文件
     os.makedirs(output_dir, exist_ok=True)
     submission_path = os.path.join(output_dir, "A2.csv")
@@ -411,9 +492,11 @@ def train_recommendation_improved(data_dir, config, output_dir, device="cuda"):
         "loss_type": loss_type,
         "popularity_weight": pop_weight,
         "remove_seen": remove_seen,
+        "use_seq_aug": config.get("use_seq_aug", True),
+        "diagnostic_report": diagnostic_report,
         "elapsed_seconds": elapsed,
         "model_type": config.get("model_type", "gru4rec"),
-        "feedback": f"验证NDCG@10={best_val_ndcg:.4f}, 损失类型={loss_type}, 流行度权重={pop_weight}",
+        "feedback": f"验证NDCG@10={best_val_ndcg:.4f}, 损失={loss_type}, 冷启动NDCG={diagnostic_report['subgroup_metrics']['cold_start_users_ndcg (seq_len<5)']:.4f}, 耗时={elapsed:.1f}s",
     }
 
     return {

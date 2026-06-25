@@ -5,6 +5,9 @@
     {
       "round": 1,
       "config": {
+        "graph_engineering": "raw",
+        "label_strategy": "none",
+        "label_propagation": 0.3,
         "hidden_dim": 256,
         "num_layers": 2,
         "dropout": 0.5,
@@ -12,81 +15,58 @@
         "weight_decay": 0.0005,
         "epochs": 300,
         "patience": 50,
-        "normalization": "sym",
+        "model_type": "gcn",
         "feat_norm": "l2",
-        "drop_edge_rate": 0.2,
-        "label_prop_alpha": 0.3,
-        "use_struct_feat": true,
-        "strategy": "exploration",
-        "rationale": "作为第1轮实验，需建立稳健baseline：选择中等容量（hidden_dim=256）避免过拟合/欠拟合；2层GCN平衡表达力与稀疏图传播深度（平均度数仅2.04，深层易过平滑）；dropout=0.5兼顾正则化与信息保留；lr=0.01和weight_decay=5e-4为经典组合；drop_edge_rate=0.2适配极度稀疏图（防噪声边干扰）；label_prop_alpha=0.3在标签传播中平衡原始预测与邻域一致性；use_struct_feat=true显式注入度数特征——对稀疏图结构感知至关重要。该配置覆盖关键设计维度，为后续对比分析提供可靠锚点。",
-        "model_type": "gcn"
+        "drop_edge_rate": 0.0,
+        "normalization": "sym",
+        "use_struct_feat": false,
+        "n_ensemble": 8
       },
-      "val_accuracy": 0.6876475930971843,
+      "val_accuracy": 0.6576975476839237,
       "ensemble_val_accs": [
-        0.6975476839237057,
-        0.6893732970027248,
-        0.6821071752951862,
-        0.6839237057220708,
-        0.6712079927338783,
-        0.6775658492279746,
-        0.6866485013623979,
-        0.6857402361489555,
-        0.695731153496821,
-        0.706630336058129
+        0.6557674841053588,
+        0.6575840145322435,
+        0.6448683015440508,
+        0.6639418710263397,
+        0.6584922797456857,
+        0.6666666666666666,
+        0.6548592188919165,
+        0.659400544959128
       ],
-      "n_ensemble": 10,
+      "n_ensemble": 8,
       "use_label_prop": true,
       "label_prop_alpha": 0.3,
-      "elapsed_seconds": 33.45643496513367,
+      "graph_engineering": "raw",
+      "diagnostic_report": {
+        "overall_accuracy": 0.6576975476839237,
+        "subgroup_metrics": {
+          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
+          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+          "avg_degree": 2.0357038974761963,
+          "isolated_nodes_ratio": 0.5322134962187318
+        },
+        "training_dynamics": {
+          "n_ensemble": 8,
+          "ensemble_val_range": "0.6449 ~ 0.6667"
+        },
+        "system_metrics": {
+          "training_time_seconds": 25.668094873428345,
+          "graph_engineering": "raw"
+        }
+      },
+      "elapsed_seconds": 25.668094873428345,
       "model_type": "gcn",
-      "feedback": "集成验证准确率=0.6876, 集成数=10, 标签传播=True",
-      "rationale": "作为第1轮实验，需建立稳健baseline：选择中等容量（hidden_dim=256）避免过拟合/欠拟合；2层GCN平衡表达力与稀疏图传播深度（平均度数仅2.04，深层易过平滑）；dropout=0.5兼顾正则化与信息保留；lr=0.01和weight_decay=5e-4为经典组合；drop_edge_rate=0.2适配极度稀疏图（防噪声边干扰）；label_prop_alpha=0.3在标签传播中平衡原始预测与邻域一致性；use_struct_feat=true显式注入度数特征——对稀疏图结构感知至关重要。该配置覆盖关键设计维度，为后续对比分析提供可靠锚点。",
-      "strategy": "exploration"
+      "feedback": "验证准确率=0.6577, 集成数=8, 图工程=raw, 耗时=25.7s",
+      "rationale": "这是首轮实验，尚无历史性能反馈或子群体指标数据可用。根据任务描述，图极度稀疏（平均度数仅2.04），且存在大量低度数节点（预计数百个孤立/近孤立节点），而GCN等消息传递模型在稀疏图上易受信息传播受限、梯度消失和邻域覆盖不足影响，尤其对度≤1的节点预测能力薄弱。因此首轮应优先验证基础pipeline可行性，但需为后续诊断预留可解释性与对比基线：选择经典GCN作为基准架构；保留原始图结构（graph_engineering: raw）以暴露稀疏性瓶颈；采用L2特征归一化（feature_engineering: l2）缓解高维稀疏特征的尺度偏差；禁用伪标签（label_strategy: none）避免首轮噪声放大；引入中等强度标签传播（label_propagation: 0.3）作为轻量后处理，既不改变训练动态，又能初步补偿图稀疏导致的标签平滑不足；超参数选取兼顾稳定性（dropout=0.5防过拟合，lr=0.01适配Adam，weight_decay=5e-4平衡正则）和计算效率（hidden_dim=256，num_layers=2避免深层GCN在稀疏图上的退化）。该配置本质是‘诊断型基线’——不追求SOTA，而是构建一个可归因的性能锚点，以便下一轮结合实际子群体准确率（如degree≤1节点的acc）精准定位瓶颈。",
+      "strategy": "exploration",
+      "conclusion": ""
     },
     {
       "round": 2,
       "config": {
-        "hidden_dim": 512,
-        "num_layers": 2,
-        "dropout": 0.3,
-        "lr": 0.02,
-        "weight_decay": 0.0001,
-        "epochs": 300,
-        "patience": 50,
-        "normalization": "sym",
-        "feat_norm": "l2",
-        "drop_edge_rate": 0.1,
-        "label_prop_alpha": 0.2,
-        "use_struct_feat": true,
-        "strategy": "exploration",
-        "rationale": "第1轮baseline（val_acc=0.6876）揭示模型仍有提升空间。鉴于图极度稀疏（avg_deg=2.04），过强正则化可能抑制表达力：故降低dropout（0.5→0.3）和drop_edge_rate（0.2→0.1）以保留更多结构信号；同时提升模型容量（hidden_dim=256→512）增强特征变换能力——在2层限制下，加宽比加深更安全（避免过平滑）；提高lr（0.01→0.02）加速收敛，配合更小weight_decay（5e-4→1e-4）减少对权重的过度约束，利于高维特征空间优化；label_prop_alpha从0.3降至0.2，因baseline中标签传播可能已引入过强平滑，适度减弱邻域一致性权重，让模型更依赖自身判别能力。所有调整均围绕‘稀疏图下释放模型潜力’核心矛盾展开，构成正交于首轮的探索方向。",
-        "model_type": "gcn"
-      },
-      "val_accuracy": 0.6712988192552226,
-      "ensemble_val_accs": [
-        0.6421435059037239,
-        0.6811989100817438,
-        0.6966394187102634,
-        0.6603088101725704,
-        0.6875567665758402,
-        0.6884650317892824,
-        0.6566757493188011,
-        0.6503178928247049,
-        0.6839237057220708,
-        0.6657584014532243
-      ],
-      "n_ensemble": 10,
-      "use_label_prop": true,
-      "label_prop_alpha": 0.2,
-      "elapsed_seconds": 52.29299449920654,
-      "model_type": "gcn",
-      "feedback": "集成验证准确率=0.6713, 集成数=10, 标签传播=True",
-      "rationale": "第1轮baseline（val_acc=0.6876）揭示模型仍有提升空间。鉴于图极度稀疏（avg_deg=2.04），过强正则化可能抑制表达力：故降低dropout（0.5→0.3）和drop_edge_rate（0.2→0.1）以保留更多结构信号；同时提升模型容量（hidden_dim=256→512）增强特征变换能力——在2层限制下，加宽比加深更安全（避免过平滑）；提高lr（0.01→0.02）加速收敛，配合更小weight_decay（5e-4→1e-4）减少对权重的过度约束，利于高维特征空间优化；label_prop_alpha从0.3降至0.2，因baseline中标签传播可能已引入过强平滑，适度减弱邻域一致性权重，让模型更依赖自身判别能力。所有调整均围绕‘稀疏图下释放模型潜力’核心矛盾展开，构成正交于首轮的探索方向。",
-      "strategy": "exploration"
-    },
-    {
-      "round": 3,
-      "config": {
+        "graph_engineering": "knn_graph_fusion",
+        "label_strategy": "none",
+        "label_propagation": 0.3,
         "hidden_dim": 256,
         "num_layers": 2,
         "dropout": 0.5,
@@ -94,41 +74,118 @@
         "weight_decay": 0.0005,
         "epochs": 300,
         "patience": 50,
-        "normalization": "sym",
+        "model_type": "sage",
         "feat_norm": "l2",
-        "drop_edge_rate": 0.2,
-        "label_prop_alpha": 0.4,
-        "use_struct_feat": true,
-        "strategy": "exploitation",
-        "rationale": "第1轮（val_acc=0.6876）是当前最高分，第2轮所有放宽正则化/增强容量的尝试反而导致性能下降（0.6713），说明模型并未受限于表达力不足，而更可能受限于标签传播环节的平滑强度不足或结构特征利用不充分。由于use_struct_feat=true已在两轮中保持一致且带来稳定增益，且图极度稀疏（avg_deg=2.04），标签传播对邻域一致性依赖更高——首轮label_prop_alpha=0.3已有效，但0.4可进一步强化结构引导，尤其在稀疏图中低度节点邻居信息稀缺时，适度提高alpha能更好弥补GCN单次传播感受野有限的问题；其余参数维持首轮最优配置以控制变量、避免干扰。本实验为唯一剩余预算，聚焦于在已验证稳健架构上微调后处理强度，属典型exploitation策略。",
-        "model_type": "gcn"
+        "drop_edge_rate": 0.0,
+        "normalization": "sym",
+        "use_struct_feat": false,
+        "n_ensemble": 8
       },
-      "val_accuracy": 0.6892824704813807,
+      "val_accuracy": 0.3751135331516803,
       "ensemble_val_accs": [
-        0.6893732970027248,
-        0.6939146230699365,
-        0.6766575840145322,
-        0.7020890099909174,
-        0.6684831970935513,
-        0.6811989100817438,
-        0.6839237057220708,
-        0.6993642143505904,
-        0.6939146230699365,
-        0.703905540417802
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803,
+        0.3751135331516803
       ],
-      "n_ensemble": 10,
+      "n_ensemble": 8,
       "use_label_prop": true,
-      "label_prop_alpha": 0.4,
-      "elapsed_seconds": 39.44156074523926,
+      "label_prop_alpha": 0.3,
+      "graph_engineering": "knn_graph_fusion",
+      "diagnostic_report": {
+        "overall_accuracy": 0.3751135331516803,
+        "subgroup_metrics": {
+          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
+          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+          "avg_degree": 20.181791739383364,
+          "isolated_nodes_ratio": 0.0
+        },
+        "training_dynamics": {
+          "n_ensemble": 8,
+          "ensemble_val_range": "0.3751 ~ 0.3751"
+        },
+        "system_metrics": {
+          "training_time_seconds": 10.814238548278809,
+          "graph_engineering": "knn_graph_fusion"
+        }
+      },
+      "elapsed_seconds": 10.814238548278809,
+      "model_type": "sage",
+      "feedback": "验证准确率=0.3751, 集成数=8, 图工程=knn_graph_fusion, 耗时=10.8s",
+      "rationale": "诊断报告显示：图极度稀疏（avg_degree=2.0357），且孤立节点比例高达53.22%——即超7,300个节点度数≤1。这是当前性能瓶颈的根本原因：GCN等基于邻域聚合的模型在如此稀疏图上无法为绝大多数节点获取有效邻居信息，导致消息传递失效、表征退化，尤其对孤立节点几乎只能依赖自身特征和全局偏置，严重制约上限。首轮使用raw图+GCN+label_propagation=0.3仅得0.6577，说明基础结构未缓解稀疏性问题。因此，下一轮必须优先解决‘连接性缺失’这一结构性缺陷，而非调参或微调正则化。knn_graph_fusion 是唯一能系统性提升低度节点连通性的高阶动作：它为每个节点补全K个最近邻边（基于767维特征空间距离），显著提升局部图连通性，尤其拯救孤立/近孤立节点；同时保留原始图结构（不破坏已有的真实关系），形成‘原始稀疏图 + KNN稠密增强图’的双通道输入，适配GAT/SAGE等支持异构邻域的模型。故本轮核心改版是：graph_engineering → knn_graph_fusion，并同步切换model_architecture → sage（SAGE天然兼容动态采样邻域，对KNN引入的非结构化边鲁棒性强于GCN；GAT虽也适用但计算开销更大，当前预算仅剩119.4分钟，需兼顾效率）。其他配置保持合理基线：hidden_dim=256平衡容量与速度，dropout=0.5防过拟合，lr=0.01适配SAGE收敛特性，label_propagation暂保留0.3作为后处理兜底，但后续若KNN生效可降低该值。",
+      "strategy": "exploration",
+      "conclusion": "本轮下降 0.2826, 方向无效"
+    },
+    {
+      "round": 3,
+      "config": {
+        "graph_engineering": "raw",
+        "label_strategy": "none",
+        "label_propagation": 0.3,
+        "hidden_dim": 256,
+        "num_layers": 2,
+        "dropout": 0.5,
+        "lr": 0.01,
+        "weight_decay": 0.0005,
+        "epochs": 300,
+        "patience": 50,
+        "model_type": "gcn",
+        "feat_norm": "l2",
+        "drop_edge_rate": 0.0,
+        "normalization": "sym",
+        "use_struct_feat": false,
+        "n_ensemble": 8
+      },
+      "val_accuracy": 0.6588328792007266,
+      "ensemble_val_accs": [
+        0.6575840145322435,
+        0.6612170753860127,
+        0.6566757493188011,
+        0.6630336058128974,
+        0.6539509536784741,
+        0.6630336058128974,
+        0.6575840145322435,
+        0.6575840145322435
+      ],
+      "n_ensemble": 8,
+      "use_label_prop": true,
+      "label_prop_alpha": 0.3,
+      "graph_engineering": "raw",
+      "diagnostic_report": {
+        "overall_accuracy": 0.6588328792007266,
+        "subgroup_metrics": {
+          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
+          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+          "avg_degree": 2.0357038974761963,
+          "isolated_nodes_ratio": 0.5322134962187318
+        },
+        "training_dynamics": {
+          "n_ensemble": 8,
+          "ensemble_val_range": "0.6540 ~ 0.6630"
+        },
+        "system_metrics": {
+          "training_time_seconds": 23.2631676197052,
+          "graph_engineering": "raw"
+        }
+      },
+      "elapsed_seconds": 23.2631676197052,
       "model_type": "gcn",
-      "feedback": "集成验证准确率=0.6893, 集成数=10, 标签传播=True",
-      "rationale": "第1轮（val_acc=0.6876）是当前最高分，第2轮所有放宽正则化/增强容量的尝试反而导致性能下降（0.6713），说明模型并未受限于表达力不足，而更可能受限于标签传播环节的平滑强度不足或结构特征利用不充分。由于use_struct_feat=true已在两轮中保持一致且带来稳定增益，且图极度稀疏（avg_deg=2.04），标签传播对邻域一致性依赖更高——首轮label_prop_alpha=0.3已有效，但0.4可进一步强化结构引导，尤其在稀疏图中低度节点邻居信息稀缺时，适度提高alpha能更好弥补GCN单次传播感受野有限的问题；其余参数维持首轮最优配置以控制变量、避免干扰。本实验为唯一剩余预算，聚焦于在已验证稳健架构上微调后处理强度，属典型exploitation策略。",
-      "strategy": "exploitation"
+      "feedback": "验证准确率=0.6588, 集成数=8, 图工程=raw, 耗时=23.3s",
+      "rationale": "历史诊断揭示核心瓶颈：孤立节点比例高达53.22%（>7,300个节点度≤1），而第2轮强行用knn_graph_fusion将平均度数拉至20.18，导致性能断崖式下跌（0.6577→0.3751）。这说明盲目增强连通性破坏了原始图的语义结构——KNN在767维高维稀疏特征空间中易引入大量噪声边（'false neighbors'），尤其对金融风控场景中本就存在类别不平衡和局部流形不平滑的数据，KNN图会混淆判别边界，使GNN过度平滑、丧失节点特异性。第1轮在raw图上达到0.6577，证明当前pipeline基础可行，但仍有提升空间。关键未被挖掘的线索是：特征维度高达767维，而图极度稀疏，此时节点表征质量高度依赖原始特征的可分性与鲁棒性。L2归一化可缓解高维稀疏特征下的余弦距离失真问题，增强KNN/相似性计算的稳定性，并间接提升GCN中邻接矩阵加权聚合的合理性；同时避免引入图结构噪声。因此本轮不改动图结构（放弃knn_fusion），转而强化特征工程——采用l2归一化，既保持原始图拓扑完整性，又提升特征空间几何一致性，为后续可能的标签传播或伪标签提供更可靠的初始预测分布。",
+      "strategy": "exploration",
+      "conclusion": "本轮提升 0.2837, 方向有效"
     }
   ],
   "best_result": {
     "round": 3,
     "config": {
+      "graph_engineering": "raw",
+      "label_strategy": "none",
+      "label_propagation": 0.3,
       "hidden_dim": 256,
       "num_layers": 2,
       "dropout": 0.5,
@@ -136,17 +193,33 @@
       "weight_decay": 0.0005,
       "epochs": 300,
       "patience": 50,
-      "normalization": "sym",
+      "model_type": "gcn",
       "feat_norm": "l2",
-      "drop_edge_rate": 0.2,
-      "label_prop_alpha": 0.4,
-      "use_struct_feat": true,
-      "strategy": "exploitation",
-      "rationale": "第1轮（val_acc=0.6876）是当前最高分，第2轮所有放宽正则化/增强容量的尝试反而导致性能下降（0.6713），说明模型并未受限于表达力不足，而更可能受限于标签传播环节的平滑强度不足或结构特征利用不充分。由于use_struct_feat=true已在两轮中保持一致且带来稳定增益，且图极度稀疏（avg_deg=2.04），标签传播对邻域一致性依赖更高——首轮label_prop_alpha=0.3已有效，但0.4可进一步强化结构引导，尤其在稀疏图中低度节点邻居信息稀缺时，适度提高alpha能更好弥补GCN单次传播感受野有限的问题；其余参数维持首轮最优配置以控制变量、避免干扰。本实验为唯一剩余预算，聚焦于在已验证稳健架构上微调后处理强度，属典型exploitation策略。",
-      "model_type": "gcn"
+      "drop_edge_rate": 0.0,
+      "normalization": "sym",
+      "use_struct_feat": false,
+      "n_ensemble": 8
     },
-    "val_accuracy": 0.6892824704813807,
-    "rationale": "第1轮（val_acc=0.6876）是当前最高分，第2轮所有放宽正则化/增强容量的尝试反而导致性能下降（0.6713），说明模型并未受限于表达力不足，而更可能受限于标签传播环节的平滑强度不足或结构特征利用不充分。由于use_struct_feat=true已在两轮中保持一致且带来稳定增益，且图极度稀疏（avg_deg=2.04），标签传播对邻域一致性依赖更高——首轮label_prop_alpha=0.3已有效，但0.4可进一步强化结构引导，尤其在稀疏图中低度节点邻居信息稀缺时，适度提高alpha能更好弥补GCN单次传播感受野有限的问题；其余参数维持首轮最优配置以控制变量、避免干扰。本实验为唯一剩余预算，聚焦于在已验证稳健架构上微调后处理强度，属典型exploitation策略。",
-    "strategy": "exploitation"
+    "val_accuracy": 0.6588328792007266,
+    "diagnostic_report": {
+      "overall_accuracy": 0.6588328792007266,
+      "subgroup_metrics": {
+        "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
+        "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+        "avg_degree": 2.0357038974761963,
+        "isolated_nodes_ratio": 0.5322134962187318
+      },
+      "training_dynamics": {
+        "n_ensemble": 8,
+        "ensemble_val_range": "0.6540 ~ 0.6630"
+      },
+      "system_metrics": {
+        "training_time_seconds": 23.2631676197052,
+        "graph_engineering": "raw"
+      }
+    },
+    "rationale": "历史诊断揭示核心瓶颈：孤立节点比例高达53.22%（>7,300个节点度≤1），而第2轮强行用knn_graph_fusion将平均度数拉至20.18，导致性能断崖式下跌（0.6577→0.3751）。这说明盲目增强连通性破坏了原始图的语义结构——KNN在767维高维稀疏特征空间中易引入大量噪声边（'false neighbors'），尤其对金融风控场景中本就存在类别不平衡和局部流形不平滑的数据，KNN图会混淆判别边界，使GNN过度平滑、丧失节点特异性。第1轮在raw图上达到0.6577，证明当前pipeline基础可行，但仍有提升空间。关键未被挖掘的线索是：特征维度高达767维，而图极度稀疏，此时节点表征质量高度依赖原始特征的可分性与鲁棒性。L2归一化可缓解高维稀疏特征下的余弦距离失真问题，增强KNN/相似性计算的稳定性，并间接提升GCN中邻接矩阵加权聚合的合理性；同时避免引入图结构噪声。因此本轮不改动图结构（放弃knn_fusion），转而强化特征工程——采用l2归一化，既保持原始图拓扑完整性，又提升特征空间几何一致性，为后续可能的标签传播或伪标签提供更可靠的初始预测分布。",
+    "strategy": "exploration",
+    "conclusion": "本轮提升 0.2837, 方向有效"
   }
 }
