@@ -103,9 +103,7 @@ class GCN(nn.Module):
 
 
 class GAT(nn.Module):
-    """简化版 GAT (基于注意力机制的图卷积)
-    使用稀疏邻接矩阵
-    """
+    """简化版 GAT (基于注意力机制的图卷积)"""
 
     def __init__(self, in_dim, hidden_dim, num_classes, num_heads=4,
                  num_layers=2, dropout=0.5):
@@ -143,6 +141,33 @@ class GAT(nn.Module):
         return logits
 
 
+class APPNP(nn.Module):
+    """APPNP: Approximate Personalized Propagation of Neural Predictions
+    适合稀疏图: 孤立节点依赖自身特征, 不依赖邻居聚合
+    Z = (1-alpha) * A_norm @ Z + alpha * H  (迭代K次)
+    """
+
+    def __init__(self, in_dim, hidden_dim, num_classes, K=10, alpha=0.1, dropout=0.5):
+        super().__init__()
+        self.K = K
+        self.alpha = alpha
+        self.dropout = dropout
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, num_classes),
+        )
+
+    def forward(self, x, adj_sparse):
+        h = self.mlp(x)
+        Z = h
+        for _ in range(self.K):
+            Z = (1 - self.alpha) * torch.sparse.mm(adj_sparse, Z) + self.alpha * h
+            Z = F.dropout(Z, p=self.dropout, training=self.training)
+        return Z
+
+
 def build_classification_model(model_type, in_dim, hidden_dim, num_classes,
                                num_layers, dropout, normalization="sym"):
     """根据模型类型构建分类模型"""
@@ -152,6 +177,8 @@ def build_classification_model(model_type, in_dim, hidden_dim, num_classes,
         return GCN(in_dim, hidden_dim, num_classes, num_layers, dropout)
     elif model_type == "gat":
         return GAT(in_dim, hidden_dim, num_classes, num_heads=4, num_layers=num_layers, dropout=dropout)
+    elif model_type == "appnp":
+        return APPNP(in_dim, hidden_dim, num_classes, K=10, alpha=0.1, dropout=dropout)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
 
@@ -263,11 +290,70 @@ class SASRec(nn.Module):
         return scores
 
 
+class GRU4RecWithFeatures(nn.Module):
+    """GRU4Rec + 用户特征融合
+    冷启动用户(无序列)依赖用户特征做推荐
+    """
+
+    def __init__(self, num_items, embedding_dim=64, hidden_dim=128,
+                 num_layers=1, dropout=0.2, max_len=50, user_feat_dims=None):
+        super().__init__()
+        self.num_items = num_items
+        self.max_len = max_len
+        self.item_embedding = nn.Embedding(num_items + 2, embedding_dim, padding_idx=0)
+        self.gru = nn.GRU(embedding_dim, hidden_dim, num_layers, batch_first=True,
+                          dropout=dropout if num_layers > 1 else 0)
+
+        # 用户特征 embedding (每个类别特征一个 embedding 层)
+        if user_feat_dims:
+            self.user_embeddings = nn.ModuleList([
+                nn.Embedding(dim + 1, 16, padding_idx=0) for dim in user_feat_dims
+            ])
+            user_repr_dim = len(user_feat_dims) * 16
+        else:
+            self.user_embeddings = None
+            user_repr_dim = 0
+
+        # 融合层: 序列表示 + 用户特征表示 → 最终表示
+        self.fusion = nn.Sequential(
+            nn.Linear(hidden_dim + user_repr_dim, hidden_dim),
+            nn.ReLU(),
+        )
+        self.output_proj = nn.Linear(hidden_dim, num_items + 1)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, seq_tensor, seq_lengths, user_features=None):
+        # 序列编码
+        emb = self.item_embedding(seq_tensor)
+        emb = self.dropout(emb)
+        packed = nn.utils.rnn.pack_padded_sequence(
+            emb, seq_lengths.cpu(), batch_first=True, enforce_sorted=False
+        )
+        _, hidden = self.gru(packed)
+        seq_repr = hidden[-1]
+
+        # 用户特征编码 + 融合
+        if self.user_embeddings is not None and user_features is not None:
+            user_embs = [emb_layer(user_features[:, i])
+                         for i, emb_layer in enumerate(self.user_embeddings)]
+            user_repr = torch.cat(user_embs, dim=-1)
+            combined = self.fusion(torch.cat([seq_repr, user_repr], dim=-1))
+        else:
+            combined = seq_repr
+
+        combined = self.dropout(combined)
+        scores = self.output_proj(combined)
+        return scores
+
+
 def build_recommendation_model(model_type, num_items, embedding_dim=64,
                                 hidden_dim=128, num_layers=1, dropout=0.2,
-                                max_len=50):
+                                max_len=50, user_feat_dims=None):
     """根据模型类型构建推荐模型"""
     if model_type == "gru4rec":
+        if user_feat_dims:
+            return GRU4RecWithFeatures(num_items, embedding_dim, hidden_dim,
+                                       num_layers, dropout, max_len, user_feat_dims)
         return GRU4Rec(num_items, embedding_dim, hidden_dim, num_layers, dropout, max_len)
     elif model_type == "sasrec":
         return SASRec(num_items, embedding_dim, hidden_dim, num_heads=2,
