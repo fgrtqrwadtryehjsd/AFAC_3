@@ -343,6 +343,76 @@ class FinalAgent:
 
             print(f"\n[结果] 第{round_num}轮: Val Acc={avg_val:.4f} | 最佳={best_metric:.4f}")
 
+        # ===== 最终重训: 用100%训练数据+伪标签 (标准竞赛做法) =====
+        if self.memory:
+            best_mem = max(self.memory, key=lambda x: x["val_accuracy"])
+            best_config = best_mem["config"]
+            best_test_probs = best_mem.get("test_probs")
+            print(f"\n[最终重训] 用100%训练数据+伪标签重训 (最佳配置来自第{best_mem['round']}轮)")
+
+            # 伪标签
+            if best_test_probs is not None:
+                conf = best_test_probs.max(axis=1)
+                mask = conf > 0.7
+                final_train = np.concatenate([train_idx, test_idx[mask]])
+                final_labels = labels.copy()
+                final_labels[test_idx[mask]] = best_test_probs.argmax(axis=1)[mask]
+                print(f"  伪标签: {mask.sum()}个节点, 总训练: {len(final_train)}")
+            else:
+                final_train = train_idx
+                final_labels = labels
+
+            # 用100%数据重训集成
+            ft_mask = torch.LongTensor(final_train).to(device)
+            ft_labels = torch.LongTensor(final_labels).to(device)
+            final_logits = []
+            for i in range(best_config["n_ensemble"]):
+                seed = 500 + i * 10
+                torch.manual_seed(seed); np.random.seed(seed)
+                model = build_classification_model(
+                    best_config["model_type"], feat_dim, best_config["hidden_dim"],
+                    num_classes, best_config["num_layers"], best_config["dropout"],
+                    best_config["normalization"]).to(device)
+                opt = torch.optim.Adam(model.parameters(), lr=best_config["lr"], weight_decay=best_config["weight_decay"])
+                sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=best_config["epochs"], eta_min=1e-5)
+                crit = nn.CrossEntropyLoss()
+                best_l = None
+                for epoch in range(1, best_config["epochs"] + 1):
+                    model.train(); opt.zero_grad()
+                    adj_tr = drop_edge(adj_sparse, best_config["drop_edge_rate"])
+                    logits = model(features_t, adj_tr)
+                    loss = crit(logits[ft_mask], ft_labels[ft_mask])
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+                    opt.step(); sched.step()
+                    model.eval()
+                    with torch.no_grad():
+                        l = F.softmax(model(features_t, adj_sparse)[test_t], dim=1).cpu().numpy()
+                    best_l = l
+                final_logits.append(best_l)
+
+            final_ensemble = np.mean(final_logits, axis=0)
+            lp_weight = best_config.get("label_propagation", 0.4)
+            lp_logits = label_propagation(features, labels, train_idx, test_idx, k_neighbors=10)
+            lp_logits = lp_logits / (lp_logits.sum(1, keepdims=True) + 1e-8)
+            final_pred = (1 - lp_weight) * final_ensemble + lp_weight * lp_logits
+            test_pred_final = final_pred.argmax(axis=1)
+
+            with open(os.path.join(OUTPUT_DIR, "A1.csv"), "w") as f:
+                f.write("test_idx,label\n")
+                for idx, p in zip(test_idx, test_pred_final):
+                    f.write(f"{idx},{p}\n")
+            print(f"  最终重训完成, 已保存A1.csv")
+
+            # 添加最终重训到轨迹
+            self.trajectory.append({
+                "round": "final_retrain",
+                "config": best_config,
+                "rationale": f"Agent停止后, 用100%训练数据+伪标签重训最佳配置(第{best_mem['round']}轮), 标准竞赛做法",
+                "strategy": "final_retrain",
+                "feedback": f"用全部{len(final_train)}个训练节点(含伪标签)重训{best_config['n_ensemble']}模型",
+            })
+
         # 保存轨迹 (排除test_probs等不可序列化的字段)
         best_entry = max(self.memory, key=lambda x: x["val_accuracy"]) if self.memory else None
         best_clean = {k: v for k, v in best_entry.items() if k != "test_probs"} if best_entry else None

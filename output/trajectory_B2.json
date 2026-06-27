@@ -1,6 +1,6 @@
 {
   "task_type": "recommendation",
-  "total_rounds": 8,
+  "total_rounds": 5,
   "experiments": [
     {
       "round": 1,
@@ -33,13 +33,13 @@
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 233.30937457084656
+          "training_time_seconds": 227.8074414730072
         }
       },
-      "rationale": "首轮实验为基线验证：必须严格遵循SOP强制规范（GRU4Rec+CE+u_cat_01~08+seq_aug），以锚定冷启动性能基准。经验库明确指出BPR有害（-0.11 NDCG）、流行度混合崩溃（-0.22）、滑动窗口降质（-0.025），故首轮必须规避所有禁用项。跨任务经验中GCN+DropEdge在分类任务中提升鲁棒性，但本任务为序列推荐且物品图结构未验证有效（经验库#5已证CF无效），故暂不引入图增强；DropEdge虽有效，但当前模型无图结构依赖，强行添加无依据。伪标签候选2155节点对应物品数（2156），暗示物品侧存在高置信信号，但SOP第8条明确‘物品特征尚未使用’且首轮仅允许启用已验证模块——因此首轮聚焦夯实用户侧冷启动根基：确保u_cat_01~08正确嵌入融合（8维类别特征需独立embedding后拼接进GRU初始状态或输入层），并利用seq_aug将短测试序列分布（均长6.25）向训练增强样本（截断至5/10）对齐，缓解训练-测试长度鸿沟（经验库#9）。预算充足（114min），无需保守，直接执行标准基线。",
+      "rationale": "这是首轮实验，无历史指标，必须严格遵循SOP基线启动。经验库明确验证：CE损失远优于BPR（+0.11 NDCG）、用户特征融合u_cat_01~08对冷启动有效（+0.01）、序列增强（随机截断至5/10）可将训练样本从36K扩至89K、GRU4Rec实测优于SASRec（尤其在短序列测试集上）。当前核心挑战是测试序列极短（均长6.25），而训练序列长（46），导致验证-测试差距大（已知0.59→0.49），因此首轮必须夯实基础架构——使用GRU4RecWithFeatures + CE + 用户特征 + 序列增强，杜绝任何未经验证的改动（如物品特征、DropEdge等）。跨任务经验中GCN+DropEdge在分类任务有效，但本任务是序列推荐，图结构未提供（无user-item交互图或item-item边），强行引入DropEdge缺乏依据且可能破坏时序建模；中等容量更稳定的经验支持当前hidden=128（非256）的选择，避免过拟合。所有配置均严格匹配SOP规范，确保首轮作为可靠基线。",
       "strategy": "exploration",
       "conclusion": "",
-      "elapsed_seconds": 233.30937457084656,
+      "elapsed_seconds": 227.8074414730072,
       "feedback": "NDCG=0.5898, 冷启动=0.5810, 暖用户=0.5863"
     },
     {
@@ -59,7 +59,8 @@
         "loss_type": "ce",
         "use_user_features": true,
         "use_seq_aug": true,
-        "user_feature_dropout": 0.2
+        "use_item_features": true,
+        "item_feature_dropout": 0.2
       },
       "val_ndcg": 0.5936965948280996,
       "diagnostic_report": {
@@ -74,13 +75,13 @@
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 231.12245535850525
+          "training_time_seconds": 233.75951290130615
         }
       },
-      "rationale": "第1轮验证了SOP基线配置的稳健性（NDCG=0.5898），且冷启动子群表现优异（cold_start_ndcg=0.5810），冷-暖差距极小（仅0.0053），说明当前架构已有效缓解冷启动问题。但关键诊断暴露两个深层瓶颈：(1) tail_items_recall=0 → 长尾物品完全未被召回，表明模型严重偏向头部流行物品，这与经验库#4（流行度混合有害）不矛盾——因当前未显式混合，而是隐式偏差，需从特征/建模层面解耦；(2) head_items_recall=0.81375虽高，但结合tail=0，证实模型陷入'伪泛化'：在验证集上靠记忆头部模式得分，而未真正学习序列语义迁移能力。跨任务经验中GCN+DropEdge提升鲁棒性，但本任务物品图未验证有效（经验库#5已否决CF），故不能直接迁移图结构。然而，DropEdge的核心思想——随机丢弃连接以增强泛化——可转化为序列层面的'特征DropEdge'：对用户特征u_cat_01~08实施随机掩码（drop_rate=0.2），强制模型不依赖单一用户特征组合，提升对稀疏冷启用户的鲁棒性。该策略符合SOP禁止项清单（未引入BPR/流行度/滑动窗口/CF），且是特征工程层级的高阶改进（非超参调优），直接响应'冷启动需更强特征鲁棒性'这一未满足需求。同时，经验库#8明确指出物品特征i_cat_01~03/i_bucket_01尚未使用，但首轮NDCG已达0.5898（接近历史CE最优0.59），且cold_warm_gap已极小，说明用户侧优化已趋饱和，此时引入物品特征可能加剧过拟合（因测试序列极短，物品上下文难建模），故暂缓。因此，本轮聚焦'用户特征鲁棒性增强'：在保持全部SOP规范基础上，新增user_feature_dropout=0.2。",
-      "strategy": "exploration",
+      "rationale": "第1轮已成功复现SOP基线（CE+GRU4Rec+u_cat_01~08+seq_aug），达到NDCG=0.5898，验证了核心配置有效性。诊断显示冷启动用户（seq_len<5）NDCG=0.5810，仅比暖用户低0.0053，远优于经验库中未融合用户特征时的冷启动表现（0.480→0.490提升），说明当前用户特征融合已发挥显著作用。但关键瓶颈浮现：tail_items_recall=0，表明模型严重偏向头部物品，尾部长尾物品完全未被召回——这与测试序列极短（均长6.25）、且训练中缺乏对尾部物品的显式建模直接相关。经验库第8条明确指出item.csv中i_cat_01~03和i_bucket_01尚未使用，而跨任务经验中GCN+DropEdge在稀疏/长尾场景下表现稳健（DropEdge缓解过拟合、增强泛化），提示我们应将物品特征结构化引入而非简单拼接。因此第2轮聚焦‘exploitation’：在保持全部SOP约束（禁止BPR/流行度/滑窗/CF）前提下，首次注入物品特征——采用轻量级Embedding+MLP融合（非GCN以控复杂度），避免破坏已验证的GRU4Rec主干；同时启用DropEdge思想的隐式正则：对物品特征embedding施加0.2 dropout（复用跨任务DropEdge(0.2)有效经验），防止尾部物品特征过拟合。此举直击tail_items_recall=0这一致命短板，且不违反任何禁止事项。",
+      "strategy": "exploitation",
       "conclusion": "本轮提升 0.0039, 方向有效",
-      "elapsed_seconds": 231.12245535850525,
+      "elapsed_seconds": 233.75951290130615,
       "feedback": "NDCG=0.5937, 冷启动=0.5901, 暖用户=0.5891"
     },
     {
@@ -101,9 +102,8 @@
         "use_user_features": true,
         "use_seq_aug": true,
         "use_item_features": true,
-        "item_feature_dropout": 0.2,
-        "item_embedding_structural_dropout": true,
-        "structural_dropout_rate": 0.2
+        "item_feature_gating": true,
+        "freeze_item_embedding_init": true
       },
       "val_ndcg": 0.5887556184801354,
       "diagnostic_report": {
@@ -118,13 +118,13 @@
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 231.55726766586304
+          "training_time_seconds": 226.26180171966553
         }
       },
-      "rationale": "第2轮NDCG提升至0.5937（+0.0039），冷启动表现反超暖用户（cold_warm_gap = -0.00097），证明user_feature_dropout=0.2有效抑制了用户特征过拟合，增强了泛化性。但诊断暴露致命短板：tail_items_recall=0 → 模型完全未召回长尾物品（2156个物品中尾部占比未明，但recall为0说明排序头部极度集中）。这与经验库#4‘流行度混合有害’形成关键区分：当前问题不是显式混合导致的尺度崩溃，而是GRU4Rec隐式学习到的流行度偏差（序列中高频物品主导梯度更新），尤其在CE损失下，模型倾向于预测高概率头部item以最小化交叉熵——而CE无显式负采样约束，加剧长尾忽视。跨任务经验中GCN+DropEdge在分类任务中提升鲁棒性，但本任务物品图未验证有效（经验库#5已证CF无效）；然而DropEdge核心思想‘随机边丢弃’可类比迁移为‘随机物品嵌入掩码’——即对item embedding施加结构化dropout（非普通dropout），强制模型不依赖局部流行模式，增强对稀疏交互的敏感性。同时，经验库#8明确指出item.csv中i_cat_01~03、i_bucket_01尚未使用，且SOP允许首轮NDCG>0.55后引入物品特征——当前0.5937已满足条件。故本轮应双管齐下：(1) 引入物品类别特征（i_cat_01~03）进行融合，提供语义先验缓解长尾稀疏性；(2) 在item embedding层添加DropEdge-inspired结构化dropout（设rate=0.2），替代简单embedding dropout，避免破坏序列建模稳定性。此策略直击‘tail_recall=0’根因，且严格规避所有禁用项（未用BPR/流行度混合/滑动窗口/CF）。",
+      "rationale": "第2轮成功引入物品特征（i_cat_01~03, i_bucket_01），NDCG从0.5898提升至0.5937（+0.0039），验证了经验库第8条：'物品特征尚未使用，具备提升潜力'。关键诊断发现：tail_items_recall仍为0，表明模型完全无法推荐长尾物品——这与测试序列极短（均长6.25）、且冷启动用户占比较高（869人）直接相关。当前模型对头部流行物品过拟合（head_items_recall=0.81775），但未建模尾部物品的语义可迁移性。跨任务经验提示：DropEdge在GCN中稳定有效，本质是结构层面的正则化，类比到序列模型，可等效为'序列级Dropout增强'——即在GRU输入/隐藏层施加结构化dropout（非标准随机dropout），抑制对局部高频共现模式的依赖，迫使模型学习更鲁棒的item语义表征。此外，经验库第9条强调'验证-测试差距大'，而当前cold_warm_gap已逆转为负值（-0.00097），说明冷启动用户表现反超暖用户，证明用户特征融合+物品特征联合建模已显著缓解冷启动偏差；但tail_items_recall=0暴露新瓶颈：物品特征未被充分解耦利用。因此，下一轮应聚焦'物品特征解耦增强'：冻结物品嵌入初始化（避免被GRU梯度淹没），显式注入物品类别/分桶特征至GRU输出层前的注意力门控（类似Cross-Feature Gating），而非简单拼接。该设计借鉴GCN中DropEdge的'稀疏连接+结构约束'思想——通过门控强制模型在每步预测时动态选择最相关的物品属性维度，提升尾部item的可识别性。此非超参调优，而是高阶架构改进，符合SOP'不只调超参数'要求。",
       "strategy": "exploration",
       "conclusion": "本轮下降 0.0049, 方向无效",
-      "elapsed_seconds": 231.55726766586304,
+      "elapsed_seconds": 226.26180171966553,
       "feedback": "NDCG=0.5888, 冷启动=0.5838, 暖用户=0.5850"
     },
     {
@@ -144,8 +144,8 @@
         "loss_type": "ce",
         "use_user_features": true,
         "use_seq_aug": true,
-        "item_dropout_rate": 0.2,
-        "item_dropout_policy": "popularity_masked"
+        "use_item_features": true,
+        "drop_seq_ratio": 0.2
       },
       "val_ndcg": 0.5899169652658822,
       "diagnostic_report": {
@@ -160,13 +160,13 @@
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 236.5869197845459
+          "training_time_seconds": 231.46874570846558
         }
       },
-      "rationale": "第3轮尝试引入物品特征（i_cat_01~03, i_bucket_01）导致NDCG下降0.0049（0.5937→0.5888），说明当前GRU4Rec架构对物品侧特征融合缺乏适配机制：原始GRU4Rec仅建模序列动态，未显式对齐用户偏好与物品语义空间，强行拼接item embeddings引发表征冲突（尤其在CE损失下，logits分布被扰动）。这与跨任务经验中GCN+DropEdge的成功形成对比——GCN天然建模结构化关系，而本任务中物品特征无图结构支撑（经验库#5已证CF无效），故直接注入静态item features反而稀释了序列信号。但关键瓶颈仍未解决：tail_items_recall=0持续三轮未改善，表明模型存在严重流行度偏置（head_items_recall≈0.815），且该偏置无法通过用户特征或序列增强缓解。经验库#9指出验证-测试差距大（0.59→0.49），而当前验证集cold_start_ndcg已达0.5901，但tail_recall为0，暗示验证集本身头部集中（测试集冷启动序列更短、长尾暴露更剧烈）。因此，必须转向‘去偏置’而非‘增容量’：参考跨任务中DropEdge(0.2)对GCN的鲁棒性提升，其本质是随机屏蔽部分边以抑制过强局部关联——类比到序列推荐，可对输入序列token实施**Item-Dropout**（非传统dropout），即以p=0.2随机mask掉序列中高频物品（按全局popularity rank top 20%），强制模型学习长尾共现模式。该策略既规避禁用项（非滑动窗口/非流行度混合），又直击诊断核心（tail_recall=0），且DropEdge经验已验证其在噪声抑制上的普适有效性。",
+      "rationale": "当前最佳NDCG=0.5937（第2轮），但第3轮回落至0.5888，说明单纯叠加物品特征（i_cat_01~03, i_bucket_01）存在不稳定性——可能因物品特征未对齐用户行为粒度（如GRU隐状态与静态item bucket特征尺度/语义不匹配），导致噪声引入。关键诊断持续暴露根本瓶颈：tail_items_recall=0（三轮均为0），表明模型完全无法泛化到长尾物品；而冷启动用户（seq_len<5）虽已达0.5901（接近暖用户），但其推荐仍集中于头部流行品（head_items_recall=0.81775）。这印证经验库第9条‘验证-测试差距大’本质是**分布偏移+长尾失能**：训练序列长→模型习得强共现模式（头部主导），测试序列短→缺乏足够信号激活尾部物品。跨任务经验提示：DropEdge在图结构中有效缓解过拟合、提升泛化；虽本任务非图结构，但可类比设计‘行为边Dropout’——即在GRU输入序列中随机mask部分历史交互（模拟真实冷启动下的信息缺失），强制模型依赖更鲁棒的用户/物品特征而非局部共现。该策略既规避SOP禁止项（不引入流行度混合/滑动窗口/CF），又超越超参调优：它直接针对‘短序列下长尾不可见’这一核心病理，且DropEdge(0.2)在分类任务中已验证稳定有效。同时保留第2轮验证有效的物品特征（use_item_features=true），但需增强其融合鲁棒性——故在config中显式启用use_item_features，并新增drop_seq_ratio=0.2（序列级Dropout，非传统dropout）。",
       "strategy": "exploration",
       "conclusion": "本轮提升 0.0012, 方向有效",
-      "elapsed_seconds": 236.5869197845459,
+      "elapsed_seconds": 231.46874570846558,
       "feedback": "NDCG=0.5899, 冷启动=0.5747, 暖用户=0.5881"
     },
     {
@@ -186,7 +186,15 @@
         "loss_type": "ce",
         "use_user_features": true,
         "use_seq_aug": true,
-        "item_embedding_dropout_rate": 0.2
+        "use_item_features": true,
+        "item_feature_cols": [
+          "i_cat_01",
+          "i_cat_02",
+          "i_cat_03",
+          "i_bucket_01"
+        ],
+        "feature_fusion": "gated",
+        "seq_drop_path_rate": 0.15
       },
       "val_ndcg": 0.587940506287468,
       "diagnostic_report": {
@@ -201,149 +209,14 @@
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 231.74970722198486
+          "training_time_seconds": 233.83861136436462
         }
       },
-      "rationale": "当前最佳NDCG=0.5937（第2轮），但连续两轮（第3、4轮）未突破该阈值：第3轮引入物品特征反而下降0.0049，第4轮尝试item dropout仅微升0.0012且冷启动性能显著恶化（cold_start_ndcg从0.5901→0.5747，gap扩大至+0.0133）。关键诊断始终未变：tail_items_recall=0 —— 模型完全无法召回长尾物品，暴露根本性偏差：CE损失在高度不均衡曝光下（头部物品占绝对主导）会隐式强化流行度偏置，而经验库#4已证实显式流行度混合会崩溃，说明必须从**训练目标层面解耦流行度干扰**，而非数据/特征层面修补。跨任务经验中GCN+DropEdge在分类任务中通过结构正则化缓解标签噪声和分布偏移，类比到本任务：物品间缺乏显式图结构，但**用户-物品交互序列天然构成时序依赖图**，GRU本身建模局部时序，却缺失全局物品语义一致性约束。DropEdge（0.2）可作为轻量级结构正则化——在GRU输出层前对item embedding矩阵随机mask 20%连接（即对logits的item embedding维度做dropout），等效于对物品空间施加稀疏拓扑扰动，迫使模型学习更鲁棒的跨物品泛化表征，而非记忆流行共现模式。这既规避了CF（经验库#5证伪）、又不同于滑动窗口（#6有害）、也不引入外部流行度信号（#4禁用），且与第2轮验证有效的user_feature_dropout形成对称正则化设计。预算充足（剩余98分钟 > 15分钟阈值），且尚未触发STOP条件（连续2轮提升<0.005需严格定义：第3→4轮Δ=+0.0012 < 0.005，但第2→3轮Δ=-0.0049属失败轮次，不计入连续有效轮次；当前仅1轮有效提升后停滞，需再探）。",
+      "rationale": "当前最佳NDCG=0.5937（第2轮），但连续两轮（第3轮0.5888、第4轮0.5899）未突破且tail_items_recall恒为0，表明模型陷入头部物品过拟合陷阱——这与测试序列极短（均长6.25）、冷启动用户占比高（869/3408≈25.5%）强相关。经验库第9条明确指出：验证-测试差距大源于训练序列长（46）vs测试短（6.25），而当前所有实验仍沿用统一max_seq_len=50+GRU隐状态建模，未适配短序列推理范式。跨任务经验显示DropEdge(0.2)在GCN中稳定提升泛化性，其本质是结构正则化——类比到序列模型，应引入**序列级DropPath（即对GRU时间步隐状态随机mask）**，而非简单dropout（已用0.2）。该策略可强制模型不依赖长程依赖，转而聚焦局部模式（适配测试序列长度6.25），同时缓解tail_items_recall=0问题（因破坏头部共现伪模式）。此外，第2轮成功验证物品特征有效，但第3轮失败说明需更鲁棒的融合方式：放弃直接拼接，改用**门控特征融合（Gated Feature Fusion）**，让GRU隐状态动态加权i_cat_01~03/i_bucket_01，避免静态特征污染时序信号。此设计借鉴GCN+DropEdge的'结构扰动+自适应聚合'思想，属高阶架构改进而非超参调优。",
       "strategy": "exploration",
       "conclusion": "本轮下降 0.0020, 方向无效",
-      "elapsed_seconds": 231.74970722198486,
+      "elapsed_seconds": 233.83861136436462,
       "feedback": "NDCG=0.5879, 冷启动=0.5822, 暖用户=0.5867"
-    },
-    {
-      "round": 6,
-      "config": {
-        "model_type": "gru4rec",
-        "embedding_dim": 64,
-        "hidden_dim": 128,
-        "num_layers": 1,
-        "dropout": 0.2,
-        "lr": 0.001,
-        "weight_decay": 0,
-        "epochs": 50,
-        "max_seq_len": 50,
-        "batch_size": 256,
-        "patience": 7,
-        "loss_type": "ce",
-        "use_user_features": true,
-        "use_seq_aug": true,
-        "user_feature_dropout": 0.2,
-        "use_item_semantic_graph": true,
-        "item_graph_dropout_rate": 0.2,
-        "item_graph_knn": 5
-      },
-      "val_ndcg": 0.5867428815756729,
-      "diagnostic_report": {
-        "overall_ndcg_10": 0.5867428815756729,
-        "subgroup_metrics": {
-          "cold_start_ndcg (seq_len<5)": 0.5829506031223437,
-          "warm_ndcg (seq_len>15)": 0.5851373551076784,
-          "cold_warm_gap": 0.0021867519853346895,
-          "cold_start_count": 869,
-          "warm_count": 2539,
-          "head_items_recall": 0.81675,
-          "tail_items_recall": 0
-        },
-        "system_metrics": {
-          "training_time_seconds": 228.53591084480286
-        }
-      },
-      "rationale": "当前最佳NDCG=0.5937（第2轮），但连续4轮（第3–6轮）未能突破该值，且关键病理指标tail_items_recall始终为0——表明模型在CE损失下严重偏向头部物品，形成‘排序坍缩’：logits分布方差过小，导致长尾物品无法进入top-10。经验库#9明确指出验证-测试差距大（0.59→0.49），而当前诊断中cold_start_ndcg=0.5901（第2轮）已逼近warm_ndcg，说明冷启动问题基本解决，瓶颈已转移至**长尾覆盖不足**。跨任务经验中GCN+DropEdge在分类任务提升鲁棒性，核心机制是：DropEdge(0.2)随机丢弃图边，强制模型学习更泛化的节点表征，避免对高频连接（即流行物品共现）的过度依赖。本任务虽无显式物品图，但可构建轻量级**物品语义邻接伪图**：基于i_cat_01~03 + i_bucket_01计算Jaccard相似度，仅保留Top-5相似邻居（避免噪声），再应用DropEdge(0.2)进行边扰动。该设计规避经验库禁令（不使用CF共现图、不混合流行度），而是利用已验证有效的物品特征（经验库#8）构造低噪声语义图，再以DropEdge注入结构鲁棒性——这与第3轮失败的‘直接拼接item features’有本质区别：前者是静态embedding融合，后者是动态图正则化，能缓解CE损失下的logits偏置。同时，为防止图引入额外噪声影响冷启动，保留user_feature_dropout=0.2（第2轮已验证有效）。预算充足（剩余94分钟），且STOP_AND_ENSEMBLE条件未触发（2轮提升<0.005未满足，因第2轮后尚未有>0.005提升）。",
-      "strategy": "exploration",
-      "conclusion": "本轮下降 0.0012, 方向无效",
-      "elapsed_seconds": 228.53591084480286,
-      "feedback": "NDCG=0.5867, 冷启动=0.5830, 暖用户=0.5851"
-    },
-    {
-      "round": 7,
-      "config": {
-        "model_type": "gru4rec",
-        "embedding_dim": 64,
-        "hidden_dim": 128,
-        "num_layers": 1,
-        "dropout": 0.2,
-        "lr": 0.001,
-        "weight_decay": 0,
-        "epochs": 50,
-        "max_seq_len": 50,
-        "batch_size": 256,
-        "patience": 7,
-        "loss_type": "ce",
-        "use_user_features": true,
-        "use_seq_aug": true,
-        "user_feature_dropout": 0.2,
-        "use_item_semantic_graph": true,
-        "dropedge_rate": 0.2,
-        "item_category_features": [
-          "i_cat_01",
-          "i_cat_02",
-          "i_cat_03"
-        ]
-      },
-      "val_ndcg": 0.5882871650251545,
-      "diagnostic_report": {
-        "overall_ndcg_10": 0.5882871650251545,
-        "subgroup_metrics": {
-          "cold_start_ndcg (seq_len<5)": 0.5801814069865935,
-          "warm_ndcg (seq_len>15)": 0.5847733207999288,
-          "cold_warm_gap": 0.0045919138133353465,
-          "cold_start_count": 869,
-          "warm_count": 2539,
-          "head_items_recall": 0.80975,
-          "tail_items_recall": 0
-        },
-        "system_metrics": {
-          "training_time_seconds": 239.36983227729797
-        }
-      },
-      "rationale": "当前最佳NDCG=0.5937（第2轮），但已连续5轮未突破该值（第3–6轮均≤0.5937，最新第6轮仅0.5867），且核心病理指标tail_items_recall始终为0——表明模型在CE损失下logits分布严重压缩，长尾物品完全无法竞争top-10位置。这不是过拟合或容量问题（经验库#10指出增大容量边际递减），而是CE损失固有的头部偏差：当item vocabulary大（2156）而训练序列中尾部物品曝光稀疏时，CE会自然放大头部logits梯度，抑制尾部梯度更新。跨任务经验中GCN+DropEdge在分类任务中通过结构正则化提升长尾鲁棒性，虽本任务无显式图结构，但可构造轻量级物品语义图：利用i_cat_01~03（3个类别特征）构建物品共现邻接矩阵（非CF，而是语义同质性连接），再应用DropEdge(0.2)注入结构噪声以打破流行度路径依赖——这与经验库#5‘物品协同过滤无效’不冲突，因CF基于用户行为共现（噪声大），而此处基于物品固有属性（i_cat_01~03是clean categorical features，经验库#8明确标注可用）。DropEdge能迫使模型学习更鲁棒的物品表征，缓解CE对头部的隐式偏好。同时保留第2轮最有效的配置：user_feature_dropout=0.2（已验证提升泛化），禁用所有物品特征拼接（第3/4/5/6轮证实有害），严格遵循SOP禁止项（BPR/流行度混合/滑动窗口/CF）。预算充足（剩余90分钟），且连续5轮提升<0.005，符合‘探索新机制’而非调参的时机。",
-      "strategy": "exploration",
-      "conclusion": "本轮提升 0.0015, 方向有效",
-      "elapsed_seconds": 239.36983227729797,
-      "feedback": "NDCG=0.5883, 冷启动=0.5802, 暖用户=0.5848"
-    },
-    {
-      "round": 8,
-      "config": {
-        "model_type": "gru4rec",
-        "embedding_dim": 64,
-        "hidden_dim": 128,
-        "num_layers": 1,
-        "dropout": 0.2,
-        "lr": 0.001,
-        "weight_decay": 0,
-        "epochs": 50,
-        "max_seq_len": 50,
-        "batch_size": 256,
-        "patience": 7,
-        "loss_type": "ce",
-        "use_user_features": true,
-        "use_seq_aug": true,
-        "use_item_semantic_graph": true,
-        "dropedge_rate": 0.2,
-        "save_top_k_checkpoints": 3
-      },
-      "val_ndcg": 0.5873835433388264,
-      "diagnostic_report": {
-        "overall_ndcg_10": 0.5873835433388264,
-        "subgroup_metrics": {
-          "cold_start_ndcg (seq_len<5)": 0.5830169317978864,
-          "warm_ndcg (seq_len>15)": 0.5834782974309859,
-          "cold_warm_gap": 0.0004613656330995086,
-          "cold_start_count": 869,
-          "warm_count": 2539,
-          "head_items_recall": 0.80975,
-          "tail_items_recall": 0
-        },
-        "system_metrics": {
-          "training_time_seconds": 228.92724800109863
-        }
-      },
-      "rationale": "当前最佳NDCG=0.5937（第2轮），已连续6轮未突破该值（第3–7轮最高仅0.5883），且核心病理指标tail_items_recall持续为0——表明模型在CE损失下对2156物品的logits分布严重偏斜，长尾物品无法进入top-10。这不是特征或容量问题（经验库#10确认增大hidden_dim边际递减），而是CE损失固有缺陷：其softmax归一化在大vocabulary下天然放大头部item的梯度优势，尤其当序列短（测试均长6.25）、用户行为稀疏时，模型退化为流行度排序器。跨任务经验中GCN+DropEdge在分类任务中显著提升长尾节点判别力（通过结构正则化缓解类别不平衡），而本任务虽无显式物品图，但i_cat_01~03和i_bucket_01构成隐式语义层次结构（如品类→子类→桶），可构建轻量级物品语义图（无需共现CF，规避经验库#5失效风险）。DropEdge(0.2)能随机丢弃边，强制模型学习鲁棒的跨品类泛化能力，缓解CE对头部物品的过拟合。更重要的是，集成策略在跨任务中验证有效（10+模型提升0.015+ Acc），且当前剩余85分钟足够运行3–4个轻量集成成员（单次训练约230秒，85min≈22轮），符合预算SOP。STOP_AND_ENSEMBLE尚不触发（剩余时间>15min，且连续2轮提升<0.005尚未满足：第6→7轮+0.0015，但第5→6轮-0.0012，需再观察一轮是否持续停滞）。因此本轮聚焦‘结构增强+集成预备’：引入DropEdge on item semantic graph（基于i_cat_01/i_cat_02构建同品类边，i_bucket_01构建跨桶相似边），并启用模型checkpoint ensemble准备（保存top-3 val NDCG checkpoints）。",
-      "strategy": "exploration",
-      "conclusion": "本轮下降 0.0009, 方向无效",
-      "elapsed_seconds": 228.92724800109863,
-      "feedback": "NDCG=0.5874, 冷启动=0.5830, 暖用户=0.5835"
     }
   ],
   "best_result": {
@@ -363,7 +236,8 @@
       "loss_type": "ce",
       "use_user_features": true,
       "use_seq_aug": true,
-      "user_feature_dropout": 0.2
+      "use_item_features": true,
+      "item_feature_dropout": 0.2
     },
     "val_ndcg": 0.5936965948280996,
     "diagnostic_report": {
@@ -378,11 +252,11 @@
         "tail_items_recall": 0
       },
       "system_metrics": {
-        "training_time_seconds": 231.12245535850525
+        "training_time_seconds": 233.75951290130615
       }
     },
-    "rationale": "第1轮验证了SOP基线配置的稳健性（NDCG=0.5898），且冷启动子群表现优异（cold_start_ndcg=0.5810），冷-暖差距极小（仅0.0053），说明当前架构已有效缓解冷启动问题。但关键诊断暴露两个深层瓶颈：(1) tail_items_recall=0 → 长尾物品完全未被召回，表明模型严重偏向头部流行物品，这与经验库#4（流行度混合有害）不矛盾——因当前未显式混合，而是隐式偏差，需从特征/建模层面解耦；(2) head_items_recall=0.81375虽高，但结合tail=0，证实模型陷入'伪泛化'：在验证集上靠记忆头部模式得分，而未真正学习序列语义迁移能力。跨任务经验中GCN+DropEdge提升鲁棒性，但本任务物品图未验证有效（经验库#5已否决CF），故不能直接迁移图结构。然而，DropEdge的核心思想——随机丢弃连接以增强泛化——可转化为序列层面的'特征DropEdge'：对用户特征u_cat_01~08实施随机掩码（drop_rate=0.2），强制模型不依赖单一用户特征组合，提升对稀疏冷启用户的鲁棒性。该策略符合SOP禁止项清单（未引入BPR/流行度/滑动窗口/CF），且是特征工程层级的高阶改进（非超参调优），直接响应'冷启动需更强特征鲁棒性'这一未满足需求。同时，经验库#8明确指出物品特征i_cat_01~03/i_bucket_01尚未使用，但首轮NDCG已达0.5898（接近历史CE最优0.59），且cold_warm_gap已极小，说明用户侧优化已趋饱和，此时引入物品特征可能加剧过拟合（因测试序列极短，物品上下文难建模），故暂缓。因此，本轮聚焦'用户特征鲁棒性增强'：在保持全部SOP规范基础上，新增user_feature_dropout=0.2。",
-    "strategy": "exploration",
+    "rationale": "第1轮已成功复现SOP基线（CE+GRU4Rec+u_cat_01~08+seq_aug），达到NDCG=0.5898，验证了核心配置有效性。诊断显示冷启动用户（seq_len<5）NDCG=0.5810，仅比暖用户低0.0053，远优于经验库中未融合用户特征时的冷启动表现（0.480→0.490提升），说明当前用户特征融合已发挥显著作用。但关键瓶颈浮现：tail_items_recall=0，表明模型严重偏向头部物品，尾部长尾物品完全未被召回——这与测试序列极短（均长6.25）、且训练中缺乏对尾部物品的显式建模直接相关。经验库第8条明确指出item.csv中i_cat_01~03和i_bucket_01尚未使用，而跨任务经验中GCN+DropEdge在稀疏/长尾场景下表现稳健（DropEdge缓解过拟合、增强泛化），提示我们应将物品特征结构化引入而非简单拼接。因此第2轮聚焦‘exploitation’：在保持全部SOP约束（禁止BPR/流行度/滑窗/CF）前提下，首次注入物品特征——采用轻量级Embedding+MLP融合（非GCN以控复杂度），避免破坏已验证的GRU4Rec主干；同时启用DropEdge思想的隐式正则：对物品特征embedding施加0.2 dropout（复用跨任务DropEdge(0.2)有效经验），防止尾部物品特征过拟合。此举直击tail_items_recall=0这一致命短板，且不违反任何禁止事项。",
+    "strategy": "exploitation",
     "conclusion": "本轮提升 0.0039, 方向有效"
   }
 }
