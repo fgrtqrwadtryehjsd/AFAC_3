@@ -5,7 +5,7 @@
     {
       "round": 1,
       "config": {
-        "side_features": "user_features",
+        "model_type": "gru4rec",
         "embedding_dim": 64,
         "hidden_dim": 128,
         "num_layers": 1,
@@ -16,172 +16,155 @@
         "max_seq_len": 50,
         "batch_size": 256,
         "patience": 7,
-        "model_type": "gru4rec",
-        "loss_type": "bpr",
-        "use_seq_aug": true,
-        "popularity_weight": 0.0,
-        "remove_seen": false,
-        "n_neg": 5
+        "loss_type": "ce",
+        "use_user_features": true,
+        "use_seq_aug": true
       },
-      "val_ndcg10": 0.4750700406281245,
-      "loss_type": "bpr",
-      "popularity_weight": 0.0,
-      "remove_seen": false,
-      "use_seq_aug": true,
+      "val_ndcg": 0.5897559563467119,
       "diagnostic_report": {
-        "overall_ndcg_10": 0.4750700406281245,
+        "overall_ndcg_10": 0.5897559563467119,
         "subgroup_metrics": {
-          "cold_start_users_ndcg (seq_len<5)": 0.4120612677447114,
-          "warm_users_ndcg (seq_len>15)": 0.4904318993075225,
+          "cold_start_ndcg (seq_len<5)": 0.5809995761078742,
+          "warm_ndcg (seq_len>15)": 0.5863390302881598,
+          "cold_warm_gap": 0.0053394541802855855,
           "cold_start_count": 869,
           "warm_count": 2539,
-          "head_items_recall": 0.6175,
+          "head_items_recall": 0.81375,
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 144.37862515449524
+          "training_time_seconds": 226.07247281074524
         }
       },
-      "elapsed_seconds": 144.37862515449524,
-      "model_type": "gru4rec",
-      "feedback": "验证NDCG@10=0.4751, 损失=bpr, 冷启动NDCG=0.4121, 耗时=144.4s",
-      "rationale": "首轮实验无历史指标，但任务描述明确揭示核心瓶颈：测试用户平均序列长度仅6.25（其中大量冷启动用户seq_len<5），而训练用户平均长度达46，存在严重训练-测试分布偏移。GRU4Rec对短序列建模能力弱，易受初始状态偏差影响；random_trunc虽可增强多样性，但对极短序列（如长度≤3）几乎无增益，反而可能破坏已有稀疏信号。相比而言，sliding_window能为短序列生成多个合理子序列（如len=4→滑动步长1、窗口=3可得2个样本），显著提升冷启动用户的数据密度与梯度稳定性；同时，引入user_features（如人口统计、设备、活跃时段等）可缓解纯行为序列缺失问题，是冷启动场景最直接有效的side information。cross_entropy损失在短序列下易受负采样偏差干扰，bpr更适配pairwise排序目标，但首轮应优先解决数据表征瓶颈而非损失函数。因此，本轮应聚焦'数据增强+特征补全'双路径：用sliding_window修复短序列样本匮乏，用user_features锚定用户固有偏好。",
+      "rationale": "首轮实验为基线验证，必须严格遵循SOP确保起点正确：使用GRU4Rec（已验证优于SASRec）、CE损失（禁用BPR）、融合全部8维用户类别特征（u_cat_01~08，经验库#2证实对冷启动+0.01）、启用序列增强（随机截断至5/10，经验库#3将训练样本从36K扩至89K，缓解短序列过拟合）。当前测试序列均长仅6.25，而训练序列均长46，存在严重分布偏移（经验库#9指出验证-测试差距达0.10），因此首轮核心目标是锚定基线NDCG并诊断冷启动子群体表现。跨任务经验中GCN+DropEdge在分类任务中提升稳定性，但本任务为序列建模且无图结构，DropEdge不适用；但‘中等容量更稳定’（hidden=256优于更大容量）提示我们暂不增大hidden_dim（当前128属中等范围），避免边际收益递减（经验库#10）。伪标签虽在分类有效，但推荐任务缺乏可靠置信度校准机制，且冷启动用户行为稀疏，暂不引入伪标签以防噪声注入。预算充足（剩余116分钟），且无历史指标，必须先获取基线结果才能触发诊断规则。",
       "strategy": "exploration",
-      "conclusion": ""
+      "conclusion": "",
+      "elapsed_seconds": 226.07247281074524,
+      "feedback": "NDCG=0.5898, 冷启动=0.5810, 暖用户=0.5863"
     },
     {
       "round": 2,
       "config": {
-        "side_features": "none",
+        "model_type": "gru4rec",
         "embedding_dim": 64,
         "hidden_dim": 128,
-        "num_layers": 2,
-        "dropout": 0.3,
+        "num_layers": 1,
+        "dropout": 0.2,
         "lr": 0.001,
         "weight_decay": 0,
         "epochs": 50,
         "max_seq_len": 50,
         "batch_size": 256,
         "patience": 7,
-        "model_type": "sasrec",
-        "loss_type": "cross_entropy",
+        "loss_type": "ce",
+        "use_user_features": true,
         "use_seq_aug": true,
-        "popularity_weight": 0.0,
-        "remove_seen": false,
-        "n_neg": 5
+        "use_item_features": true
       },
-      "val_ndcg10": 0.592637306221314,
-      "loss_type": "cross_entropy",
-      "popularity_weight": 0.0,
-      "remove_seen": false,
-      "use_seq_aug": true,
+      "val_ndcg": 0.5936965948280996,
       "diagnostic_report": {
-        "overall_ndcg_10": 0.592637306221314,
+        "overall_ndcg_10": 0.5936965948280996,
         "subgroup_metrics": {
-          "cold_start_users_ndcg (seq_len<5)": 0.5788967684476852,
-          "warm_users_ndcg (seq_len>15)": 0.5932048178616682,
+          "cold_start_ndcg (seq_len<5)": 0.590116794668781,
+          "warm_ndcg (seq_len>15)": 0.5891473400861847,
+          "cold_warm_gap": -0.0009694545825962297,
           "cold_start_count": 869,
           "warm_count": 2539,
-          "head_items_recall": 0.81275,
+          "head_items_recall": 0.81775,
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 152.615478515625
+          "training_time_seconds": 228.5211627483368
         }
       },
-      "elapsed_seconds": 152.615478515625,
-      "model_type": "sasrec",
-      "feedback": "验证NDCG@10=0.5926, 损失=cross_entropy, 冷启动NDCG=0.5789, 耗时=152.6s",
-      "rationale": "诊断报告揭示核心瓶颈：冷启动用户（seq_len<5）NDCG=0.4121，显著低于整体0.4751和暖启用户0.4904，差距达0.0783；而长尾物品召回未显式报告但head_items_recall=0.6175偏高，暗示模型过度聚焦头部物品——这与短序列下GRU4Rec依赖强时序模式、难以泛化到稀疏交互的特性高度一致。首轮使用user_features虽引入辅助信息，但对冷启动用户（特征可能稀疏或无区分度）提升有限；且random_trunc在极短序列上无效（如len=3截断后更短），反而加剧信息损失。跨任务经验中dropout=0.5在分类任务中有效缓解过拟合，提示当前dropout=0.2可能不足；更重要的是，滑动_window能将短序列（如len=6）生成多个合理子序列（如[1:21], [2:22], ...），显著扩充冷启动样本多样性，直接缓解训练-测试分布偏移。因此本轮应放弃user_features（冷启用户特征有效性存疑），转向sliding_window增强，并切换为SASRec——其自注意力机制对短序列建模更鲁棒（无需递归状态传递），且天然支持位置编码补偿序列长度不足。",
-      "strategy": "exploration",
-      "conclusion": "本轮提升 0.1176, 方向有效"
+      "rationale": "第1轮验证了SOP基线配置的正确性（GRU4Rec+CE+u_cat_01~08+seq_aug），达到NDCG=0.5898，但诊断揭示关键问题：tail_items_recall=0，说明模型完全忽略长尾物品（占数据分布主体），而冷启动用户（seq_len<5）NDCG=0.5810虽接近暖用户（0.5863），但gap虽小却源于二者同步偏低——根本症结在于模型未利用物品侧信息。经验库#8明确指出item.csv中i_cat_01~03和i_bucket_01尚未使用，且跨任务经验显示：GCN+DropEdge在分类任务中通过结构化特征融合显著提升尾部表现（Acc+0.02），DropEdge(0.2)可缓解稀疏连接噪声。当前GRU4Rec纯序列建模缺乏物品语义锚点，导致对测试短序列（均长6.25）中高频/低频物品判别力不足。因此，第2轮应exploitation式引入物品特征融合，而非调参——将i_cat_01~03（类别）、i_bucket_01（热度分桶）编码后与item embedding拼接，保持GRU结构不变。此举直接响应经验库#9‘验证-测试差距大’的根本原因（训练长序列依赖共现模式，测试短序列需强先验），且规避所有禁止项（未用BPR/流行度/滑窗/CF）。预算充足（剩余112分钟），且首轮已达0.5898（>0.55阈值），符合SOP第9条‘首轮>0.55则添加物品特征’。",
+      "strategy": "exploitation",
+      "conclusion": "本轮提升 0.0039, 方向有效",
+      "elapsed_seconds": 228.5211627483368,
+      "feedback": "NDCG=0.5937, 冷启动=0.5901, 暖用户=0.5891"
     },
     {
       "round": 3,
       "config": {
-        "side_features": "none",
+        "model_type": "gru4rec",
         "embedding_dim": 64,
         "hidden_dim": 128,
-        "num_layers": 2,
-        "dropout": 0.3,
+        "num_layers": 1,
+        "dropout": 0.2,
         "lr": 0.001,
         "weight_decay": 0,
         "epochs": 50,
         "max_seq_len": 50,
         "batch_size": 256,
         "patience": 7,
-        "model_type": "gru4rec",
-        "loss_type": "bpr",
+        "loss_type": "ce",
+        "use_user_features": true,
         "use_seq_aug": true,
-        "popularity_weight": 0.0,
-        "remove_seen": false,
-        "n_neg": 5
+        "use_item_features": true,
+        "use_item_graph": true,
+        "item_graph_dropout": 0.2,
+        "item_graph_layers": 1
       },
-      "val_ndcg10": 0.45905365653806257,
-      "loss_type": "bpr",
-      "popularity_weight": 0.0,
-      "remove_seen": false,
-      "use_seq_aug": true,
+      "val_ndcg": 0.5887556184801354,
       "diagnostic_report": {
-        "overall_ndcg_10": 0.45905365653806257,
+        "overall_ndcg_10": 0.5887556184801354,
         "subgroup_metrics": {
-          "cold_start_users_ndcg (seq_len<5)": 0.4070308404997967,
-          "warm_users_ndcg (seq_len>15)": 0.4714050019933696,
+          "cold_start_ndcg (seq_len<5)": 0.5837513713304001,
+          "warm_ndcg (seq_len>15)": 0.5850093550589023,
+          "cold_warm_gap": 0.0012579837285021656,
           "cold_start_count": 869,
           "warm_count": 2539,
-          "head_items_recall": 0.603,
+          "head_items_recall": 0.8135,
           "tail_items_recall": 0
         },
         "system_metrics": {
-          "training_time_seconds": 146.78847980499268
+          "training_time_seconds": 234.43685698509216
         }
       },
-      "elapsed_seconds": 146.78847980499268,
-      "model_type": "gru4rec",
-      "feedback": "验证NDCG@10=0.4591, 损失=bpr, 冷启动NDCG=0.4070, 耗时=146.8s",
-      "rationale": "诊断报告揭示关键矛盾：第2轮已显著提升冷启动用户NDCG（0.5789 → 较第1轮+0.1668），且冷启/暖启性能差距大幅收窄（仅差0.0143），说明当前架构（GRU4Rec + no side features + deeper network）对短序列泛化能力已有实质性改善；但head_items_recall高达0.8127，远超合理基线（通常≤0.7），暗示模型过度拟合高频交互模式，牺牲长尾物品覆盖——这与任务描述中'2,156物品'和'测试序列极短'高度相关：短序列下用户意图稀疏，模型被迫依赖共现统计（即头部物品），而缺乏item side features或更鲁棒的loss无法校正该偏差。cross_entropy loss在短序列上易受正样本稀疏性影响，加剧头部偏差；bpr loss通过隐式负采样可增强长尾判别力；同时，sliding_window数据增强能为短序列生成更多局部上下文视图（如将len=4序列滑动生成[1:3],[2:4]等子序列），缓解训练-测试分布偏移，比random_trunc更适合seq_len<5场景。因此，下一轮应聚焦'长尾召回不足'这一新瓶颈，而非继续探索side_features（第1轮user_features未带来增益且增加噪声）。",
+      "rationale": "第2轮成功引入物品特征（i_cat_01~03, i_bucket_01）后，NDCG提升至0.5937（+0.0039），且关键诊断指标发生质变：冷启动用户NDCG反超暖用户（0.5901 > 0.5891），cold_warm_gap由+0.0053转为-0.0010，表明物品特征有效缓解了冷启动与长尾建模的双重偏差。但tail_items_recall仍为0，暴露根本缺陷——当前物品特征仅作静态embedding拼接，未建模物品间语义关系（如类别层级、bucket分布相似性），导致模型无法泛化到尾部物品。跨任务经验中GCN+DropEdge在分类任务中显著提升稀疏信号建模能力（DropEdge=0.2稳定有效），且中等容量更鲁棒，提示可将物品特征图结构化：以i_cat_01/i_cat_02/i_cat_03为节点类型，i_bucket_01为边权重构建轻量物品异构图，用DropEdge(0.2)增强泛化性。此举不增加序列长度负担（符合冷启动约束），且避免滑动窗口/流行度混合等已验证有害操作；同时严格遵循SOP——保持GRU4Rec主干、CE损失、用户特征融合、序列增强，仅在物品侧注入结构先验，精准靶向tail_items_recall=0的病理。",
       "strategy": "exploration",
-      "conclusion": "本轮下降 0.1336, 方向无效"
+      "conclusion": "本轮下降 0.0049, 方向无效",
+      "elapsed_seconds": 234.43685698509216,
+      "feedback": "NDCG=0.5888, 冷启动=0.5838, 暖用户=0.5850"
     }
   ],
   "best_result": {
     "round": 2,
     "config": {
-      "side_features": "none",
+      "model_type": "gru4rec",
       "embedding_dim": 64,
       "hidden_dim": 128,
-      "num_layers": 2,
-      "dropout": 0.3,
+      "num_layers": 1,
+      "dropout": 0.2,
       "lr": 0.001,
       "weight_decay": 0,
       "epochs": 50,
       "max_seq_len": 50,
       "batch_size": 256,
       "patience": 7,
-      "model_type": "sasrec",
-      "loss_type": "cross_entropy",
+      "loss_type": "ce",
+      "use_user_features": true,
       "use_seq_aug": true,
-      "popularity_weight": 0.0,
-      "remove_seen": false,
-      "n_neg": 5
+      "use_item_features": true
     },
-    "val_ndcg": 0.592637306221314,
+    "val_ndcg": 0.5936965948280996,
     "diagnostic_report": {
-      "overall_ndcg_10": 0.592637306221314,
+      "overall_ndcg_10": 0.5936965948280996,
       "subgroup_metrics": {
-        "cold_start_users_ndcg (seq_len<5)": 0.5788967684476852,
-        "warm_users_ndcg (seq_len>15)": 0.5932048178616682,
+        "cold_start_ndcg (seq_len<5)": 0.590116794668781,
+        "warm_ndcg (seq_len>15)": 0.5891473400861847,
+        "cold_warm_gap": -0.0009694545825962297,
         "cold_start_count": 869,
         "warm_count": 2539,
-        "head_items_recall": 0.81275,
+        "head_items_recall": 0.81775,
         "tail_items_recall": 0
       },
       "system_metrics": {
-        "training_time_seconds": 152.615478515625
+        "training_time_seconds": 228.5211627483368
       }
     },
-    "rationale": "诊断报告揭示核心瓶颈：冷启动用户（seq_len<5）NDCG=0.4121，显著低于整体0.4751和暖启用户0.4904，差距达0.0783；而长尾物品召回未显式报告但head_items_recall=0.6175偏高，暗示模型过度聚焦头部物品——这与短序列下GRU4Rec依赖强时序模式、难以泛化到稀疏交互的特性高度一致。首轮使用user_features虽引入辅助信息，但对冷启动用户（特征可能稀疏或无区分度）提升有限；且random_trunc在极短序列上无效（如len=3截断后更短），反而加剧信息损失。跨任务经验中dropout=0.5在分类任务中有效缓解过拟合，提示当前dropout=0.2可能不足；更重要的是，滑动_window能将短序列（如len=6）生成多个合理子序列（如[1:21], [2:22], ...），显著扩充冷启动样本多样性，直接缓解训练-测试分布偏移。因此本轮应放弃user_features（冷启用户特征有效性存疑），转向sliding_window增强，并切换为SASRec——其自注意力机制对短序列建模更鲁棒（无需递归状态传递），且天然支持位置编码补偿序列长度不足。",
-    "strategy": "exploration",
-    "conclusion": "本轮提升 0.1176, 方向有效"
+    "rationale": "第1轮验证了SOP基线配置的正确性（GRU4Rec+CE+u_cat_01~08+seq_aug），达到NDCG=0.5898，但诊断揭示关键问题：tail_items_recall=0，说明模型完全忽略长尾物品（占数据分布主体），而冷启动用户（seq_len<5）NDCG=0.5810虽接近暖用户（0.5863），但gap虽小却源于二者同步偏低——根本症结在于模型未利用物品侧信息。经验库#8明确指出item.csv中i_cat_01~03和i_bucket_01尚未使用，且跨任务经验显示：GCN+DropEdge在分类任务中通过结构化特征融合显著提升尾部表现（Acc+0.02），DropEdge(0.2)可缓解稀疏连接噪声。当前GRU4Rec纯序列建模缺乏物品语义锚点，导致对测试短序列（均长6.25）中高频/低频物品判别力不足。因此，第2轮应exploitation式引入物品特征融合，而非调参——将i_cat_01~03（类别）、i_bucket_01（热度分桶）编码后与item embedding拼接，保持GRU结构不变。此举直接响应经验库#9‘验证-测试差距大’的根本原因（训练长序列依赖共现模式，测试短序列需强先验），且规避所有禁止项（未用BPR/流行度/滑窗/CF）。预算充足（剩余112分钟），且首轮已达0.5898（>0.55阈值），符合SOP第9条‘首轮>0.55则添加物品特征’。",
+    "strategy": "exploitation",
+    "conclusion": "本轮提升 0.0039, 方向有效"
   }
 }

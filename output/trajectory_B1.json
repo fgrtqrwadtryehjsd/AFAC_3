@@ -5,9 +5,7 @@
     {
       "round": 1,
       "config": {
-        "graph_engineering": "raw",
-        "label_strategy": "none",
-        "label_propagation": 0.3,
+        "model_type": "gcn",
         "hidden_dim": 256,
         "num_layers": 2,
         "dropout": 0.5,
@@ -15,58 +13,59 @@
         "weight_decay": 0.0005,
         "epochs": 300,
         "patience": 50,
-        "model_type": "gcn",
-        "feat_norm": "l2",
-        "drop_edge_rate": 0.0,
         "normalization": "sym",
-        "use_struct_feat": false,
-        "n_ensemble": 8
+        "feat_norm": "l2",
+        "drop_edge_rate": 0.2,
+        "label_propagation": 0.4,
+        "use_pseudo_label": false,
+        "n_ensemble": 10
       },
-      "val_accuracy": 0.6576975476839237,
+      "val_accuracy": 0.6902815622161671,
       "ensemble_val_accs": [
-        0.6557674841053588,
-        0.6575840145322435,
-        0.6448683015440508,
-        0.6639418710263397,
-        0.6584922797456857,
-        0.6666666666666666,
-        0.6548592188919165,
-        0.659400544959128
+        0.6975476839237057,
+        0.695731153496821,
+        0.6902815622161671,
+        0.6911898274296094,
+        0.6821071752951862,
+        0.6830154405086285,
+        0.6893732970027248,
+        0.6920980926430518,
+        0.6902815622161671,
+        0.6911898274296094
       ],
-      "n_ensemble": 8,
-      "use_label_prop": true,
-      "label_prop_alpha": 0.3,
-      "graph_engineering": "raw",
       "diagnostic_report": {
-        "overall_accuracy": 0.6576975476839237,
+        "overall_accuracy": 0.6902815622161671,
         "subgroup_metrics": {
-          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
-          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+          "high_degree_acc (degree>5)": "see_overall",
+          "low_degree_acc (degree<=1)": "see_overall",
+          "degree_gap": 0.0
+        },
+        "graph_stats": {
           "avg_degree": 2.0357038974761963,
           "isolated_nodes_ratio": 0.5322134962187318
         },
+        "test_confidence": {
+          "mean_confidence": 0.8379232883453369,
+          "high_confidence_ratio (>0.8)": 0.6772082878953108,
+          "pseudo_label_candidates": 1863
+        },
         "training_dynamics": {
-          "n_ensemble": 8,
-          "ensemble_val_range": "0.6449 ~ 0.6667"
+          "train_loss": 0.30299487709999084
         },
         "system_metrics": {
-          "training_time_seconds": 25.668094873428345,
-          "graph_engineering": "raw"
+          "training_time_seconds": 41.985893964767456
         }
       },
-      "elapsed_seconds": 25.668094873428345,
-      "model_type": "gcn",
-      "feedback": "验证准确率=0.6577, 集成数=8, 图工程=raw, 耗时=25.7s",
-      "rationale": "这是首轮实验，尚无历史性能反馈或子群体指标数据可用。根据任务描述，图极度稀疏（平均度数仅2.04），且存在大量低度数节点（预计数百个孤立/近孤立节点），而GCN等消息传递模型在稀疏图上易受信息传播受限、梯度消失和邻域覆盖不足影响，尤其对度≤1的节点预测能力薄弱。因此首轮应优先验证基础pipeline可行性，但需为后续诊断预留可解释性与对比基线：选择经典GCN作为基准架构；保留原始图结构（graph_engineering: raw）以暴露稀疏性瓶颈；采用L2特征归一化（feature_engineering: l2）缓解高维稀疏特征的尺度偏差；禁用伪标签（label_strategy: none）避免首轮噪声放大；引入中等强度标签传播（label_propagation: 0.3）作为轻量后处理，既不改变训练动态，又能初步补偿图稀疏导致的标签平滑不足；超参数选取兼顾稳定性（dropout=0.5防过拟合，lr=0.01适配Adam，weight_decay=5e-4平衡正则）和计算效率（hidden_dim=256，num_layers=2避免深层GCN在稀疏图上的退化）。该配置本质是‘诊断型基线’——不追求SOTA，而是构建一个可归因的性能锚点，以便下一轮结合实际子群体准确率（如degree≤1节点的acc）精准定位瓶颈。",
+      "rationale": "这是首轮实验，无历史指标可参考，但已知数据极度稀疏（53%孤立节点，平均度数仅2.04），根据SOP诊断规则：IF 孤立节点比例>30% THEN 提高标签传播权重(0.3→0.4)。经验库第6条也验证标签传播在0.3-0.4区间有效，且对稀疏节点补充至关重要；同时，经验库第1/2/3/7/10条已强验证：L2特征归一化、GCN架构、DropEdge=0.2、sym归一化、lr=0.01是不可妥协的基线配置。首轮不启用伪标签（经验库第5条要求先确认baseline>0.65再引入），集成数设为n_ensemble=10——处于SOP推荐的10-20区间下限，兼顾首轮稳定性与后续提升空间；epochs=300和patience=50符合典型GCN收敛需求，避免早停过激。所有配置均严格规避禁止事项（如KNN图、rw归一化、关闭DropEdge）。",
       "strategy": "exploration",
-      "conclusion": ""
+      "conclusion": "",
+      "elapsed_seconds": 41.985893964767456,
+      "feedback": "Val Acc=0.6903, 孤立节点=53.2%, 伪标签候选=1863"
     },
     {
       "round": 2,
       "config": {
-        "graph_engineering": "knn_graph_fusion",
-        "label_strategy": "none",
-        "label_propagation": 0.3,
+        "model_type": "gcn",
         "hidden_dim": 256,
         "num_layers": 2,
         "dropout": 0.5,
@@ -74,58 +73,59 @@
         "weight_decay": 0.0005,
         "epochs": 300,
         "patience": 50,
-        "model_type": "sage",
-        "feat_norm": "l2",
-        "drop_edge_rate": 0.0,
         "normalization": "sym",
-        "use_struct_feat": false,
-        "n_ensemble": 8
+        "feat_norm": "l2",
+        "drop_edge_rate": 0.2,
+        "label_propagation": 0.4,
+        "use_pseudo_label": true,
+        "n_ensemble": 10
       },
-      "val_accuracy": 0.3751135331516803,
+      "val_accuracy": 0.6989100817438693,
       "ensemble_val_accs": [
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803,
-        0.3751135331516803
+        0.7057220708446866,
+        0.698455949137148,
+        0.698455949137148,
+        0.6911898274296094,
+        0.6975476839237057,
+        0.7084468664850136,
+        0.6948228882833788,
+        0.6930063578564941,
+        0.7002724795640327,
+        0.701180744777475
       ],
-      "n_ensemble": 8,
-      "use_label_prop": true,
-      "label_prop_alpha": 0.3,
-      "graph_engineering": "knn_graph_fusion",
       "diagnostic_report": {
-        "overall_accuracy": 0.3751135331516803,
+        "overall_accuracy": 0.6989100817438693,
         "subgroup_metrics": {
-          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
-          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
-          "avg_degree": 20.181791739383364,
-          "isolated_nodes_ratio": 0.0
+          "high_degree_acc (degree>5)": "see_overall",
+          "low_degree_acc (degree<=1)": "see_overall",
+          "degree_gap": 0.0
+        },
+        "graph_stats": {
+          "avg_degree": 2.0357038974761963,
+          "isolated_nodes_ratio": 0.5322134962187318
+        },
+        "test_confidence": {
+          "mean_confidence": 0.8700476288795471,
+          "high_confidence_ratio (>0.8)": 0.7230098146128681,
+          "pseudo_label_candidates": 1989
         },
         "training_dynamics": {
-          "n_ensemble": 8,
-          "ensemble_val_range": "0.3751 ~ 0.3751"
+          "train_loss": 0.28947699069976807
         },
         "system_metrics": {
-          "training_time_seconds": 10.814238548278809,
-          "graph_engineering": "knn_graph_fusion"
+          "training_time_seconds": 41.29628276824951
         }
       },
-      "elapsed_seconds": 10.814238548278809,
-      "model_type": "sage",
-      "feedback": "验证准确率=0.3751, 集成数=8, 图工程=knn_graph_fusion, 耗时=10.8s",
-      "rationale": "诊断报告显示：图极度稀疏（avg_degree=2.0357），且孤立节点比例高达53.22%——即超7,300个节点度数≤1。这是当前性能瓶颈的根本原因：GCN等基于邻域聚合的模型在如此稀疏图上无法为绝大多数节点获取有效邻居信息，导致消息传递失效、表征退化，尤其对孤立节点几乎只能依赖自身特征和全局偏置，严重制约上限。首轮使用raw图+GCN+label_propagation=0.3仅得0.6577，说明基础结构未缓解稀疏性问题。因此，下一轮必须优先解决‘连接性缺失’这一结构性缺陷，而非调参或微调正则化。knn_graph_fusion 是唯一能系统性提升低度节点连通性的高阶动作：它为每个节点补全K个最近邻边（基于767维特征空间距离），显著提升局部图连通性，尤其拯救孤立/近孤立节点；同时保留原始图结构（不破坏已有的真实关系），形成‘原始稀疏图 + KNN稠密增强图’的双通道输入，适配GAT/SAGE等支持异构邻域的模型。故本轮核心改版是：graph_engineering → knn_graph_fusion，并同步切换model_architecture → sage（SAGE天然兼容动态采样邻域，对KNN引入的非结构化边鲁棒性强于GCN；GAT虽也适用但计算开销更大，当前预算仅剩119.4分钟，需兼顾效率）。其他配置保持合理基线：hidden_dim=256平衡容量与速度，dropout=0.5防过拟合，lr=0.01适配SAGE收敛特性，label_propagation暂保留0.3作为后处理兜底，但后续若KNN生效可降低该值。",
-      "strategy": "exploration",
-      "conclusion": "本轮下降 0.2826, 方向无效"
+      "rationale": "第1轮已达成0.6903，符合SOP中'首轮baseline完成且准确率>0.65'的触发条件，可启动伪标签策略。诊断报告显示test_confidence中high_confidence_ratio (>0.8)达67.7%，且mean_confidence=0.838，说明模型对大量测试样本具备高置信预测能力；同时subgroup_metrics显示degree_gap=0.0，表明高低度节点性能无显著偏差，说明当前GCN+label_propagation=0.4已较好缓解孤立节点（53%）带来的信息缺失问题。但经验库第5条明确指出：伪标签（置信度>0.8）二轮训练可带来+0.01–0.02提升；且当前尚未启用该策略，属于高性价比、低风险的exploitation动作。注意：不可降低label_propagation权重（当前0.4已是SOP针对>30%孤立节点推荐的上限），故本轮应保持label_propagation=0.4，仅新增use_pseudo_label=true，并确保伪标签仅基于>0.8置信度筛选——这与SOP中'IF 首轮baseline完成且准确率>0.65 THEN 考虑伪标签'完全一致。其余配置均严格遵循已验证最优组合（GCN/sym/l2/DropEdge=0.2/lr=0.01），无需调整。",
+      "strategy": "exploitation",
+      "conclusion": "本轮提升 0.0086, 方向有效",
+      "elapsed_seconds": 41.29628276824951,
+      "feedback": "Val Acc=0.6989, 孤立节点=53.2%, 伪标签候选=1989"
     },
     {
       "round": 3,
       "config": {
-        "graph_engineering": "raw",
-        "label_strategy": "none",
-        "label_propagation": 0.3,
+        "model_type": "gcn",
         "hidden_dim": 256,
         "num_layers": 2,
         "dropout": 0.5,
@@ -133,59 +133,61 @@
         "weight_decay": 0.0005,
         "epochs": 300,
         "patience": 50,
-        "model_type": "gcn",
-        "feat_norm": "l2",
-        "drop_edge_rate": 0.0,
         "normalization": "sym",
-        "use_struct_feat": false,
-        "n_ensemble": 8
+        "feat_norm": "l2",
+        "drop_edge_rate": 0.2,
+        "label_propagation": 0.3,
+        "use_pseudo_label": false,
+        "n_ensemble": 10,
+        "feature_preprocessing": "lda_128"
       },
-      "val_accuracy": 0.6588328792007266,
+      "val_accuracy": 0.6888283378746595,
       "ensemble_val_accs": [
-        0.6575840145322435,
-        0.6612170753860127,
-        0.6566757493188011,
-        0.6630336058128974,
-        0.6539509536784741,
-        0.6630336058128974,
-        0.6575840145322435,
-        0.6575840145322435
+        0.6911898274296094,
+        0.6884650317892824,
+        0.6911898274296094,
+        0.6948228882833788,
+        0.6811989100817438,
+        0.6857402361489555,
+        0.6884650317892824,
+        0.6993642143505904,
+        0.6902815622161671,
+        0.6775658492279746
       ],
-      "n_ensemble": 8,
-      "use_label_prop": true,
-      "label_prop_alpha": 0.3,
-      "graph_engineering": "raw",
       "diagnostic_report": {
-        "overall_accuracy": 0.6588328792007266,
+        "overall_accuracy": 0.6888283378746595,
         "subgroup_metrics": {
-          "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
-          "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+          "high_degree_acc (degree>5)": "see_overall",
+          "low_degree_acc (degree<=1)": "see_overall",
+          "degree_gap": 0.0
+        },
+        "graph_stats": {
           "avg_degree": 2.0357038974761963,
           "isolated_nodes_ratio": 0.5322134962187318
         },
+        "test_confidence": {
+          "mean_confidence": 0.8332293033599854,
+          "high_confidence_ratio (>0.8)": 0.6699382042893494,
+          "pseudo_label_candidates": 1843
+        },
         "training_dynamics": {
-          "n_ensemble": 8,
-          "ensemble_val_range": "0.6540 ~ 0.6630"
+          "train_loss": 0.2834756672382355
         },
         "system_metrics": {
-          "training_time_seconds": 23.2631676197052,
-          "graph_engineering": "raw"
+          "training_time_seconds": 41.031105041503906
         }
       },
-      "elapsed_seconds": 23.2631676197052,
-      "model_type": "gcn",
-      "feedback": "验证准确率=0.6588, 集成数=8, 图工程=raw, 耗时=23.3s",
-      "rationale": "历史诊断揭示核心瓶颈：孤立节点比例高达53.22%（>7,300个节点度≤1），而第2轮强行用knn_graph_fusion将平均度数拉至20.18，导致性能断崖式下跌（0.6577→0.3751）。这说明盲目增强连通性破坏了原始图的语义结构——KNN在767维高维稀疏特征空间中易引入大量噪声边（'false neighbors'），尤其对金融风控场景中本就存在类别不平衡和局部流形不平滑的数据，KNN图会混淆判别边界，使GNN过度平滑、丧失节点特异性。第1轮在raw图上达到0.6577，证明当前pipeline基础可行，但仍有提升空间。关键未被挖掘的线索是：特征维度高达767维，而图极度稀疏，此时节点表征质量高度依赖原始特征的可分性与鲁棒性。L2归一化可缓解高维稀疏特征下的余弦距离失真问题，增强KNN/相似性计算的稳定性，并间接提升GCN中邻接矩阵加权聚合的合理性；同时避免引入图结构噪声。因此本轮不改动图结构（放弃knn_fusion），转而强化特征工程——采用l2归一化，既保持原始图拓扑完整性，又提升特征空间几何一致性，为后续可能的标签传播或伪标签提供更可靠的初始预测分布。",
+      "rationale": "当前第2轮已启用伪标签（use_pseudo_label=true），Acc提升至0.6989（+0.0086），验证了伪标签在该数据上的有效性。但诊断报告显示：high_confidence_ratio (>0.8)为72.3%，而pseudo_label_candidates数量未完整显示，结合经验库第5条‘伪标签有效：置信度>0.8的测试预测加入训练集，二轮训练+0.01–0.02’，说明仍有约27.7%的测试样本未达阈值，限制了伪标签增益上限。进一步观察subgroup_metrics中degree_gap=0.0，表面高低度节点性能一致，但graph_stats揭示53.2%节点为孤立点（degree≤1）——这些节点无结构信息，完全依赖特征和标签传播；而label_propagation=0.4虽已按SOP上调（因isolated_nodes_ratio>30%），但经验库第6条指出标签传播‘基于特征相似度’，当前L2归一化+高维（767维）特征下，余弦相似度易受噪声干扰。因此，单纯提高alpha可能加剧错误传播。更稳健路径是：先冻结伪标签策略（避免低质量伪标签污染），转而优化标签传播的输入质量——即增强特征判别性。经验库未覆盖特征工程，但SOP明确‘不要只调超参数！要关注特征工程、模型架构、数据增强等高阶决策’。考虑到767维原始特征高度冗余（典型高维稀疏图场景），可引入线性判别分析（LDA）或PCA降维预处理：LDA在多类（10类）且样本量充足（11k训练）时能最大化类间分离度，且计算轻量（预算充裕）。降维至128维既能缓解高维相似度失真，又保留足够判别力（经验表明>64维对10分类通常足够）。同时，将label_propagation回调至0.3——因特征质量提升后，过高的alpha（0.4）反而导致平滑过度、淹没真实类别边界（尤其对孤立节点，其邻域为空，全依赖特征相似度；若特征更纯净，则更低alpha更安全）。此举非退步，而是‘以特征提纯换取传播稳健性’的协同优化。",
       "strategy": "exploration",
-      "conclusion": "本轮提升 0.2837, 方向有效"
+      "conclusion": "本轮下降 0.0101, 方向无效",
+      "elapsed_seconds": 41.031105041503906,
+      "feedback": "Val Acc=0.6888, 孤立节点=53.2%, 伪标签候选=1843"
     }
   ],
   "best_result": {
-    "round": 3,
+    "round": 2,
     "config": {
-      "graph_engineering": "raw",
-      "label_strategy": "none",
-      "label_propagation": 0.3,
+      "model_type": "gcn",
       "hidden_dim": 256,
       "num_layers": 2,
       "dropout": 0.5,
@@ -193,33 +195,39 @@
       "weight_decay": 0.0005,
       "epochs": 300,
       "patience": 50,
-      "model_type": "gcn",
-      "feat_norm": "l2",
-      "drop_edge_rate": 0.0,
       "normalization": "sym",
-      "use_struct_feat": false,
-      "n_ensemble": 8
+      "feat_norm": "l2",
+      "drop_edge_rate": 0.2,
+      "label_propagation": 0.4,
+      "use_pseudo_label": true,
+      "n_ensemble": 10
     },
-    "val_accuracy": 0.6588328792007266,
+    "val_accuracy": 0.6989100817438693,
     "diagnostic_report": {
-      "overall_accuracy": 0.6588328792007266,
+      "overall_accuracy": 0.6989100817438693,
       "subgroup_metrics": {
-        "high_degree_nodes_acc (degree>5)": "approx_same_as_overall",
-        "low_degree_nodes_acc (degree<=1)": "approx_same_as_overall",
+        "high_degree_acc (degree>5)": "see_overall",
+        "low_degree_acc (degree<=1)": "see_overall",
+        "degree_gap": 0.0
+      },
+      "graph_stats": {
         "avg_degree": 2.0357038974761963,
         "isolated_nodes_ratio": 0.5322134962187318
       },
+      "test_confidence": {
+        "mean_confidence": 0.8700476288795471,
+        "high_confidence_ratio (>0.8)": 0.7230098146128681,
+        "pseudo_label_candidates": 1989
+      },
       "training_dynamics": {
-        "n_ensemble": 8,
-        "ensemble_val_range": "0.6540 ~ 0.6630"
+        "train_loss": 0.28947699069976807
       },
       "system_metrics": {
-        "training_time_seconds": 23.2631676197052,
-        "graph_engineering": "raw"
+        "training_time_seconds": 41.29628276824951
       }
     },
-    "rationale": "历史诊断揭示核心瓶颈：孤立节点比例高达53.22%（>7,300个节点度≤1），而第2轮强行用knn_graph_fusion将平均度数拉至20.18，导致性能断崖式下跌（0.6577→0.3751）。这说明盲目增强连通性破坏了原始图的语义结构——KNN在767维高维稀疏特征空间中易引入大量噪声边（'false neighbors'），尤其对金融风控场景中本就存在类别不平衡和局部流形不平滑的数据，KNN图会混淆判别边界，使GNN过度平滑、丧失节点特异性。第1轮在raw图上达到0.6577，证明当前pipeline基础可行，但仍有提升空间。关键未被挖掘的线索是：特征维度高达767维，而图极度稀疏，此时节点表征质量高度依赖原始特征的可分性与鲁棒性。L2归一化可缓解高维稀疏特征下的余弦距离失真问题，增强KNN/相似性计算的稳定性，并间接提升GCN中邻接矩阵加权聚合的合理性；同时避免引入图结构噪声。因此本轮不改动图结构（放弃knn_fusion），转而强化特征工程——采用l2归一化，既保持原始图拓扑完整性，又提升特征空间几何一致性，为后续可能的标签传播或伪标签提供更可靠的初始预测分布。",
-    "strategy": "exploration",
-    "conclusion": "本轮提升 0.2837, 方向有效"
+    "rationale": "第1轮已达成0.6903，符合SOP中'首轮baseline完成且准确率>0.65'的触发条件，可启动伪标签策略。诊断报告显示test_confidence中high_confidence_ratio (>0.8)达67.7%，且mean_confidence=0.838，说明模型对大量测试样本具备高置信预测能力；同时subgroup_metrics显示degree_gap=0.0，表明高低度节点性能无显著偏差，说明当前GCN+label_propagation=0.4已较好缓解孤立节点（53%）带来的信息缺失问题。但经验库第5条明确指出：伪标签（置信度>0.8）二轮训练可带来+0.01–0.02提升；且当前尚未启用该策略，属于高性价比、低风险的exploitation动作。注意：不可降低label_propagation权重（当前0.4已是SOP针对>30%孤立节点推荐的上限），故本轮应保持label_propagation=0.4，仅新增use_pseudo_label=true，并确保伪标签仅基于>0.8置信度筛选——这与SOP中'IF 首轮baseline完成且准确率>0.65 THEN 考虑伪标签'完全一致。其余配置均严格遵循已验证最优组合（GCN/sym/l2/DropEdge=0.2/lr=0.01），无需调整。",
+    "strategy": "exploitation",
+    "conclusion": "本轮提升 0.0086, 方向有效"
   }
 }
