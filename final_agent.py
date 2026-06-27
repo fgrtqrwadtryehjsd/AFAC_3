@@ -663,7 +663,7 @@ def main():
     cls_score, rec_score = 0, 0
 
     if args.task in ("both", "cls"):
-        cls_score = agent.run_classification(device=args.device)
+        cls_score = agent.run_classification(device=args.device, n_ensemble=20)
     if args.task in ("both", "rec"):
         rec_score = agent.run_recommendation(device=args.device)
 
