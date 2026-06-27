@@ -16,25 +16,25 @@
         "normalization": "sym",
         "feat_norm": "l2",
         "drop_edge_rate": 0.2,
-        "label_propagation": 0.4,
+        "label_propagation": 0.3,
         "use_pseudo_label": false,
         "n_ensemble": 10
       },
-      "val_accuracy": 0.6907356948228883,
+      "val_accuracy": 0.691008174386921,
       "ensemble_val_accs": [
-        0.6966394187102634,
+        0.6948228882833788,
+        0.695731153496821,
+        0.6911898274296094,
         0.6893732970027248,
+        0.6830154405086285,
         0.6920980926430518,
-        0.6893732970027248,
         0.6920980926430518,
-        0.6821071752951862,
-        0.6875567665758402,
-        0.6893732970027248,
-        0.6939146230699365,
+        0.6884650317892824,
+        0.6884650317892824,
         0.6948228882833788
       ],
       "diagnostic_report": {
-        "overall_accuracy": 0.6907356948228883,
+        "overall_accuracy": 0.691008174386921,
         "subgroup_metrics": {
           "high_degree_acc (degree>5)": "see_overall",
           "low_degree_acc (degree<=1)": "see_overall",
@@ -45,22 +45,22 @@
           "isolated_nodes_ratio": 0.5322134962187318
         },
         "test_confidence": {
-          "mean_confidence": 0.8362978100776672,
-          "high_confidence_ratio (>0.8)": 0.6786623046165031,
-          "pseudo_label_candidates": 1867
+          "mean_confidence": 0.83433598279953,
+          "high_confidence_ratio (>0.8)": 0.6677571792075608,
+          "pseudo_label_candidates": 1837
         },
         "training_dynamics": {
-          "train_loss": 0.30501991510391235
+          "train_loss": 0.30348002910614014
         },
         "system_metrics": {
-          "training_time_seconds": 41.496559619903564
+          "training_time_seconds": 83.8732373714447
         }
       },
-      "rationale": "这是首轮实验，无历史指标反馈，但任务数据具有极端稀疏性（53%孤立节点，平均度数仅2.04），根据SOP诊断规则：IF 孤立节点比例>30% THEN 提高标签传播权重(0.3→0.4)。因此，首轮即应启用更强的标签传播（alpha=0.4）以缓解稀疏连接导致的信息孤岛问题；同时严格遵循全部SOP硬约束：GCN架构、sym归一化、L2特征归一化、DropEdge=0.2（已验证+0.03增益）、lr=0.01（经验库验证最优）。集成规模设为n_ensemble=10作为起点，后续可根据提升幅度动态扩展至15–20；伪标签暂禁用（SOP要求首轮Acc>0.65才启用），因首轮目标是建立可靠基线而非过早引入噪声标签。",
+      "rationale": "首轮实验为基线启动，必须严格遵循SOP和已验证经验库：数据极度稀疏（53%孤立节点），因此需优先启用标签传播（alpha=0.3→0.4更优，但首轮保守起始用0.3以避免过拟合）；GCN是唯一经9次实验验证最优的模型（SAGE/GAT/APPNP均失败或次优）；L2特征归一化+对称归一化是精度跃升的关键基础（经验库#1、#10）；DropEdge(0.2)必须启用（经验库#3），否则Acc将暴跌；集成规模设为n_ensemble=10——处于SOP推荐区间[10-20]下限，便于后续根据首轮表现向上扩展（经验库#4指出15模型提升明显，故首轮不直接设20以保留优化空间）；伪标签暂禁用（SOP要求‘首轮baseline完成且Acc>0.65’才启动，当前无历史指标，不可预设）；超参全部采用经验库验证最优基线（lr=0.01、hidden_dim=256等）。此配置覆盖所有已知关键杠杆，无冗余尝试，确保首轮稳健可比。",
       "strategy": "exploration",
       "conclusion": "",
-      "elapsed_seconds": 41.496559619903564,
-      "feedback": "Val Acc=0.6907, 孤立节点=53.2%, 伪标签候选=1867"
+      "elapsed_seconds": 83.8732373714447,
+      "feedback": "Val Acc=0.6910, 孤立节点=53.2%, 伪标签候选=1837"
     },
     {
       "round": 2,
@@ -76,25 +76,25 @@
         "normalization": "sym",
         "feat_norm": "l2",
         "drop_edge_rate": 0.2,
-        "label_propagation": 0.3,
-        "use_pseudo_label": false,
+        "label_propagation": 0.4,
+        "use_pseudo_label": true,
         "n_ensemble": 10
       },
-      "val_accuracy": 0.6914623069936422,
+      "val_accuracy": 0.69763851044505,
       "ensemble_val_accs": [
-        0.6920980926430518,
-        0.6966394187102634,
-        0.6902815622161671,
-        0.6920980926430518,
-        0.6875567665758402,
         0.698455949137148,
-        0.6821071752951862,
-        0.6875567665758402,
+        0.6975476839237057,
+        0.6948228882833788,
+        0.6966394187102634,
         0.6939146230699365,
-        0.6939146230699365
+        0.703905540417802,
+        0.695731153496821,
+        0.6966394187102634,
+        0.703905540417802,
+        0.6948228882833788
       ],
       "diagnostic_report": {
-        "overall_accuracy": 0.6914623069936422,
+        "overall_accuracy": 0.69763851044505,
         "subgroup_metrics": {
           "high_degree_acc (degree>5)": "see_overall",
           "low_degree_acc (degree<=1)": "see_overall",
@@ -105,22 +105,22 @@
           "isolated_nodes_ratio": 0.5322134962187318
         },
         "test_confidence": {
-          "mean_confidence": 0.8325960040092468,
-          "high_confidence_ratio (>0.8)": 0.6717557251908397,
-          "pseudo_label_candidates": 1848
+          "mean_confidence": 0.8669458627700806,
+          "high_confidence_ratio (>0.8)": 0.7153762268266085,
+          "pseudo_label_candidates": 1968
         },
         "training_dynamics": {
-          "train_loss": 0.3021191656589508
+          "train_loss": 0.2905769646167755
         },
         "system_metrics": {
-          "training_time_seconds": 40.46310901641846
+          "training_time_seconds": 67.79147863388062
         }
       },
-      "rationale": "第1轮已达成Val Acc=0.6907，符合SOP中'首轮baseline完成且准确率>0.65'的触发条件，可进入伪标签阶段。诊断报告显示：测试集高置信度样本比例达67.87%（>0.8），均值置信度0.836，说明模型对大量样本预测可靠；同时孤立节点占比高达53.2%，虽已启用label_propagation=0.4（SOP强制要求），但子群体指标显示degree_gap=0.0，暗示当前标签传播未能有效区分高低连接性节点的表现——可能因alpha=0.4在过度平滑与信息保留间失衡（经验库#9指出APPNP需alpha>0.5才稳定，而GCN式传播在极端稀疏图中同样对alpha敏感）。因此，第2轮应尝试降低label_propagation至0.3，释放部分局部结构约束，为后续伪标签腾出校准空间；同时保持其他SOP硬约束不变（GCN/sym/L2/DropEdge=0.2），避免引入噪声（如禁用KNN）或破坏稳定性（如改归一化）。此举非调参试探，而是基于图稀疏性与置信分布的协同策略调整：先稳住传播强度，再以高置信伪标签注入高质量监督信号。",
+      "rationale": "诊断显示：当前孤立节点比例高达53.2%（>30%），根据SOP诊断规则'IF 孤立节点比例>30% THEN 提高标签传播权重(0.3→0.4)'，必须提升label_propagation至0.4以增强对稀疏/孤立节点的标签补全能力；同时，test_confidence报告显示高置信度样本占比达66.8%，且mean_confidence=0.834，说明模型已具备可靠判别能力——满足SOP中'IF 首轮baseline完成且准确率>0.65 THEN 启动伪标签'条件，因此本轮应同步启用use_pseudo_label=true（置信度阈值0.8），为下一轮迭代积累高质量伪标签；n_ensemble=10处于经验库推荐区间下限（15-20最优），但首轮尚未验证集成收益，且预算充足（剩余118分钟），故暂不调整集成数，优先验证标签传播+伪标签双增强路径；所有其他配置（GCN、sym+l2、DropEdge=0.2、lr=0.01等）均严格遵循已验证最优组合，无调整必要。",
       "strategy": "exploration",
-      "conclusion": "本轮提升 0.0007, 方向有效",
-      "elapsed_seconds": 40.46310901641846,
-      "feedback": "Val Acc=0.6915, 孤立节点=53.2%, 伪标签候选=1848"
+      "conclusion": "本轮提升 0.0066, 方向有效",
+      "elapsed_seconds": 67.79147863388062,
+      "feedback": "Val Acc=0.6976, 孤立节点=53.2%, 伪标签候选=1968"
     },
     {
       "round": 3,
@@ -136,25 +136,31 @@
         "normalization": "sym",
         "feat_norm": "l2",
         "drop_edge_rate": 0.2,
-        "label_propagation": 0.3,
+        "label_propagation": 0.4,
         "use_pseudo_label": true,
-        "n_ensemble": 10
+        "pseudo_label_threshold": 0.7,
+        "n_ensemble": 15
       },
-      "val_accuracy": 0.6995458673932788,
+      "val_accuracy": 0.6984559491371481,
       "ensemble_val_accs": [
-        0.6966394187102634,
+        0.6993642143505904,
+        0.695731153496821,
+        0.7020890099909174,
+        0.6948228882833788,
         0.6975476839237057,
+        0.698455949137148,
+        0.6948228882833788,
+        0.7111716621253406,
+        0.6966394187102634,
+        0.703905540417802,
+        0.6993642143505904,
+        0.6902815622161671,
+        0.7002724795640327,
         0.6939146230699365,
-        0.701180744777475,
-        0.6993642143505904,
-        0.6993642143505904,
-        0.6920980926430518,
-        0.709355131698456,
-        0.7048138056312443,
-        0.701180744777475
+        0.698455949137148
       ],
       "diagnostic_report": {
-        "overall_accuracy": 0.6995458673932788,
+        "overall_accuracy": 0.6984559491371481,
         "subgroup_metrics": {
           "high_degree_acc (degree>5)": "see_overall",
           "low_degree_acc (degree<=1)": "see_overall",
@@ -165,22 +171,22 @@
           "isolated_nodes_ratio": 0.5322134962187318
         },
         "test_confidence": {
-          "mean_confidence": 0.8636555671691895,
-          "high_confidence_ratio (>0.8)": 0.7102871683024354,
-          "pseudo_label_candidates": 1954
+          "mean_confidence": 0.8907248377799988,
+          "high_confidence_ratio (>0.8)": 0.7833515085423483,
+          "pseudo_label_candidates": 2155
         },
         "training_dynamics": {
-          "train_loss": 0.2714221477508545
+          "train_loss": 0.2926037311553955
         },
         "system_metrics": {
-          "training_time_seconds": 52.75861477851868
+          "training_time_seconds": 100.37801694869995
         }
       },
-      "rationale": "当前最佳Val Acc=0.6915（第2轮），较第1轮仅微增0.0007，且两轮subgroup_metrics中degree_gap=0.0，说明模型对高低度节点无区分性——这与图极度稀疏（53%孤立节点、avg_degree=2.04）高度相关：孤立节点无法通过GNN聚合邻居信息，完全依赖label propagation或初始特征；而当前label_propagation=0.3（第2轮）反而略低于第1轮的0.4，但第2轮指标略高，表明alpha=0.3可能在当前噪声-信号平衡下更优。关键突破点在于：诊断报告中test_confidence显示高置信度样本比例达67.18%（>0.8），均值置信度0.8326，满足SOP中'首轮baseline完成且准确率>0.65 → 考虑伪标签'条件；且伪标签已验证可提升+0.01~0.02（经验库#5）。必须启用use_pseudo_label=true，并严格设定置信度阈值为0.8（经验库明确要求），将高置信测试预测作为软标签加入训练集，进行二轮训练。此非超参调优，而是数据增强层面的关键升级，直接针对稀疏图中标签稀缺问题。同时保持n_ensemble=10（尚未达最优15-20区间，但伪标签本身即强提升项，优先验证其有效性），其余配置严格遵循SOP硬约束：GCN、sym、l2、drop_edge_rate=0.2不可动摇。",
+      "rationale": "当前第2轮已达成Val Acc=0.6976（+0.0066），验证了label_propagation从0.3→0.4的有效性，且test_confidence显著提升（mean_conf=0.867，高置信>0.8样本占比71.5%），说明模型对测试集预测更可靠，具备伪标签安全扩展条件。根据SOP诊断规则：'IF 首轮baseline完成且准确率>0.65 THEN 启动伪标签(置信度>0.8)' —— 第2轮已满足该条件并已启用伪标签，且提升显著（+0.0066），符合'IF 伪标签有效 THEN 继续伪标签, 降低阈值'的决策链。当前高置信样本比例已达71.5%，且孤立节点比例仍高达53.2%，亟需扩大伪标签覆盖以缓解稀疏监督瓶颈；将pseudo_label_threshold从隐含的0.8（默认）降至0.7可新增约15–20%中等置信样本（基于confidence分布估算），同时避免引入过多噪声（经验库#5表明阈值≤0.7仍保持正向增益）。此外，集成规模n_ensemble=10处于SOP推荐下限（10–20），而经验库#4明确指出'15模型→20模型边际递减'，但10→15有明显提升空间，故本轮应同步提升集成规模至15以捕获更多模型多样性。注意：不可调整KNN图（经验库#8禁止）、不可关闭DropEdge（SOP强制）、不可改归一化方式（经验库#10）。",
       "strategy": "exploitation",
-      "conclusion": "本轮提升 0.0081, 方向有效",
-      "elapsed_seconds": 52.75861477851868,
-      "feedback": "Val Acc=0.6995, 孤立节点=53.2%, 伪标签候选=1954"
+      "conclusion": "本轮提升 0.0008, 方向有效",
+      "elapsed_seconds": 100.37801694869995,
+      "feedback": "Val Acc=0.6985, 孤立节点=53.2%, 伪标签候选=2155"
     }
   ],
   "best_result": {
@@ -197,13 +203,14 @@
       "normalization": "sym",
       "feat_norm": "l2",
       "drop_edge_rate": 0.2,
-      "label_propagation": 0.3,
+      "label_propagation": 0.4,
       "use_pseudo_label": true,
-      "n_ensemble": 10
+      "pseudo_label_threshold": 0.7,
+      "n_ensemble": 15
     },
-    "val_accuracy": 0.6995458673932788,
+    "val_accuracy": 0.6984559491371481,
     "diagnostic_report": {
-      "overall_accuracy": 0.6995458673932788,
+      "overall_accuracy": 0.6984559491371481,
       "subgroup_metrics": {
         "high_degree_acc (degree>5)": "see_overall",
         "low_degree_acc (degree<=1)": "see_overall",
@@ -214,19 +221,19 @@
         "isolated_nodes_ratio": 0.5322134962187318
       },
       "test_confidence": {
-        "mean_confidence": 0.8636555671691895,
-        "high_confidence_ratio (>0.8)": 0.7102871683024354,
-        "pseudo_label_candidates": 1954
+        "mean_confidence": 0.8907248377799988,
+        "high_confidence_ratio (>0.8)": 0.7833515085423483,
+        "pseudo_label_candidates": 2155
       },
       "training_dynamics": {
-        "train_loss": 0.2714221477508545
+        "train_loss": 0.2926037311553955
       },
       "system_metrics": {
-        "training_time_seconds": 52.75861477851868
+        "training_time_seconds": 100.37801694869995
       }
     },
-    "rationale": "当前最佳Val Acc=0.6915（第2轮），较第1轮仅微增0.0007，且两轮subgroup_metrics中degree_gap=0.0，说明模型对高低度节点无区分性——这与图极度稀疏（53%孤立节点、avg_degree=2.04）高度相关：孤立节点无法通过GNN聚合邻居信息，完全依赖label propagation或初始特征；而当前label_propagation=0.3（第2轮）反而略低于第1轮的0.4，但第2轮指标略高，表明alpha=0.3可能在当前噪声-信号平衡下更优。关键突破点在于：诊断报告中test_confidence显示高置信度样本比例达67.18%（>0.8），均值置信度0.8326，满足SOP中'首轮baseline完成且准确率>0.65 → 考虑伪标签'条件；且伪标签已验证可提升+0.01~0.02（经验库#5）。必须启用use_pseudo_label=true，并严格设定置信度阈值为0.8（经验库明确要求），将高置信测试预测作为软标签加入训练集，进行二轮训练。此非超参调优，而是数据增强层面的关键升级，直接针对稀疏图中标签稀缺问题。同时保持n_ensemble=10（尚未达最优15-20区间，但伪标签本身即强提升项，优先验证其有效性），其余配置严格遵循SOP硬约束：GCN、sym、l2、drop_edge_rate=0.2不可动摇。",
+    "rationale": "当前第2轮已达成Val Acc=0.6976（+0.0066），验证了label_propagation从0.3→0.4的有效性，且test_confidence显著提升（mean_conf=0.867，高置信>0.8样本占比71.5%），说明模型对测试集预测更可靠，具备伪标签安全扩展条件。根据SOP诊断规则：'IF 首轮baseline完成且准确率>0.65 THEN 启动伪标签(置信度>0.8)' —— 第2轮已满足该条件并已启用伪标签，且提升显著（+0.0066），符合'IF 伪标签有效 THEN 继续伪标签, 降低阈值'的决策链。当前高置信样本比例已达71.5%，且孤立节点比例仍高达53.2%，亟需扩大伪标签覆盖以缓解稀疏监督瓶颈；将pseudo_label_threshold从隐含的0.8（默认）降至0.7可新增约15–20%中等置信样本（基于confidence分布估算），同时避免引入过多噪声（经验库#5表明阈值≤0.7仍保持正向增益）。此外，集成规模n_ensemble=10处于SOP推荐下限（10–20），而经验库#4明确指出'15模型→20模型边际递减'，但10→15有明显提升空间，故本轮应同步提升集成规模至15以捕获更多模型多样性。注意：不可调整KNN图（经验库#8禁止）、不可关闭DropEdge（SOP强制）、不可改归一化方式（经验库#10）。",
     "strategy": "exploitation",
-    "conclusion": "本轮提升 0.0081, 方向有效"
+    "conclusion": "本轮提升 0.0008, 方向有效"
   }
 }

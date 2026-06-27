@@ -203,20 +203,21 @@ class FinalAgent:
             train_indices = train_only
             train_labels_arr = labels
 
-            # 伪标签: 用上一轮的高置信度预测扩充训练集
+            # 伪标签: 用历史最佳的预测扩充训练集, 置信度递减
             if use_pseudo and self.memory:
-                prev_diag = self.memory[-1].get("diagnostic_report", {})
-                n_pseudo = prev_diag.get("test_confidence", {}).get("pseudo_label_candidates", 0)
-                if n_pseudo > 0:
-                    # 用上一轮的最佳测试预测做伪标签
-                    prev_test_probs = self.memory[-1].get("test_probs")
-                    if prev_test_probs is not None:
-                        conf = prev_test_probs.max(axis=1)
-                        mask = conf > 0.8
-                        train_indices = np.concatenate([train_only, test_idx[mask]])
-                        train_labels_arr = labels.copy()
-                        train_labels_arr[test_idx[mask]] = prev_test_probs.argmax(axis=1)[mask]
-                        print(f"  伪标签: {mask.sum()}个高置信度节点加入训练集")
+                # 找历史最佳轮次的预测
+                best_mem = max(self.memory, key=lambda x: x["val_accuracy"])
+                prev_test_probs = best_mem.get("test_probs")
+                # 统计伪标签轮次, 递减置信度
+                pseudo_count = sum(1 for m in self.memory if m.get("config", {}).get("use_pseudo_label", False))
+                conf_threshold = max(0.5, 0.8 - pseudo_count * 0.1)  # 0.8→0.7→0.6→0.5
+                if prev_test_probs is not None:
+                    conf = prev_test_probs.max(axis=1)
+                    mask = conf > conf_threshold
+                    train_indices = np.concatenate([train_only, test_idx[mask]])
+                    train_labels_arr = labels.copy()
+                    train_labels_arr[test_idx[mask]] = prev_test_probs.argmax(axis=1)[mask]
+                    print(f"  伪标签(第{pseudo_count+1}轮, 阈值>{conf_threshold}): {mask.sum()}个节点加入训练集")
 
             # 训练集成
             train_mask_t = torch.LongTensor(train_indices).to(device)
