@@ -179,8 +179,49 @@ def build_classification_model(model_type, in_dim, hidden_dim, num_classes,
         return GAT(in_dim, hidden_dim, num_classes, num_heads=4, num_layers=num_layers, dropout=dropout)
     elif model_type == "appnp":
         return APPNP(in_dim, hidden_dim, num_classes, K=10, alpha=0.1, dropout=dropout)
+    elif model_type == "mlp":
+        return MLPCls(in_dim, hidden_dim, num_classes, num_layers, dropout)
     else:
         raise ValueError(f"Unknown model type: {model_type}")
+
+
+class MLPCls(nn.Module):
+    """纯MLP分类模型 (Graph-MLP思路)
+    不依赖消息传递, 适合53%孤立节点
+    训练时用NContrast对比损失利用图结构监督
+    测试时不需要邻接矩阵
+    """
+
+    def __init__(self, in_dim, hidden_dim, num_classes, num_layers=2, dropout=0.5):
+        super().__init__()
+        self.layers = nn.ModuleList()
+        self.norms = nn.ModuleList()
+        self.layers.append(nn.Linear(in_dim, hidden_dim))
+        self.norms.append(nn.LayerNorm(hidden_dim))
+        for _ in range(num_layers - 1):
+            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
+            self.norms.append(nn.LayerNorm(hidden_dim))
+        self.classifier = nn.Linear(hidden_dim, num_classes)
+        self.dropout = dropout
+
+    def forward(self, x, adj_sparse=None):
+        """adj_sparse参数保留但不用 (兼容接口)"""
+        h = x
+        for i in range(len(self.layers)):
+            h = self.layers[i](h)
+            h = self.norms[i](h)
+            h = F.relu(h)
+            h = F.dropout(h, p=self.dropout, training=self.training)
+        return self.classifier(h)
+
+    def get_embedding(self, x):
+        """获取节点嵌入 (用于对比损失)"""
+        h = x
+        for i in range(len(self.layers)):
+            h = self.layers[i](h)
+            h = self.norms[i](h)
+            h = F.relu(h)
+        return h
 
 
 # ======================== Task2: GRU4Rec 序列推荐模型 ========================
