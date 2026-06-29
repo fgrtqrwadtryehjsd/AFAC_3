@@ -122,11 +122,11 @@ def run_classification(device="cuda", n_ensemble=20):
         best_pred = pred_f
         print("[选择] 最终重训")
 
-    # 标签传播(0.5 - 提高权重)
-    print(f"\n[标签传播] 权重=0.5")
+    # 标签传播(0.4 - 回退最优权重, 0.5已证明有害)
+    print(f"\n[标签传播] 权重=0.4")
     lp = label_propagation(features, labels, train_idx, test_idx, k_neighbors=10)
     lp = lp / (lp.sum(1, keepdims=True) + 1e-8)
-    final_pred = 0.5 * best_pred + 0.5 * lp
+    final_pred = 0.6 * best_pred + 0.4 * lp
     test_pred = final_pred.argmax(1)
 
     elapsed = time.time() - start_time
