@@ -391,10 +391,13 @@ def run_recommendation(device="cuda", sim_lambda=0.6):
             _, topk = scores.topk(10, dim=1)
             all_predictions.extend(topk.cpu().numpy().tolist())
 
-    with open(os.path.join(OUTPUT_DIR, "A2.csv"), "w") as f:
-        f.write("user_id,rec_1,rec_2,rec_3,rec_4,rec_5,rec_6,rec_7,rec_8,rec_9,rec_10\n")
+    with open(os.path.join(OUTPUT_DIR, "A2.csv"), "w", encoding="utf-8") as f:
+        f.write("uid,prediction\n")
         for i, pred in enumerate(all_predictions):
-            f.write(f"{test_uids[i]}," + ",".join(map(str, pred)) + "\n")
+            items = [idx2item.get(idx, "i000001") for idx in pred if idx in idx2item and idx > 0]
+            while len(items) < 10:
+                items.append("i000001")
+            f.write(f'{test_uids[i]},"{",".join(items[:10])}"\n')
 
     return best_val_ndcg
 
