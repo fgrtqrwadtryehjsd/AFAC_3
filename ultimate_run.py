@@ -474,7 +474,7 @@ def main():
     if args.task in ("both", "cls"):
         cls_val = run_classification(device=device, n_ensemble=20)
     if args.task in ("both", "rec"):
-        rec_val = run_recommendation(device=device, sim_lambda=0.3)
+        rec_val = run_recommendation(device=device, sim_lambda=0.5)
 
     elapsed = time.time() - t0
     final = 0.5 * cls_val + 0.5 * rec_val
