@@ -336,7 +336,7 @@ def main():
 
     cls_val = 0.69; rec_val = 0
     if args.task in ("both", "cls"):
-        cls_val = run_cls(device=device, n_ensemble=30, lp_weight=args.lp)
+        cls_val = run_cls(device=device, n_ensemble=50, lp_weight=args.lp)
     if args.task in ("both", "rec"):
         rec_val = run_rec(device=device, sim_lambda=args.lambda_sim)
 
