@@ -160,8 +160,8 @@ def main():
     avg_fused = (fused1 + fused2 + fused3) / 3
     print(f"[对比] 3轮平均融合")
 
-    # 用第3轮 (伪标签最多1479个, 阈值0.6最充分)
-    test_pred = fused3.argmax(axis=1)
+    # 用第1轮 (无伪标签, 更稳定, 避免伪标签噪声)
+    test_pred = fused1.argmax(axis=1)
 
     elapsed = time.time() - t0
     print(f"\n[完成] 3轮伪标签+30模型集成+GCN嵌入标签传播 | 耗时: {elapsed/60:.1f}分钟")
