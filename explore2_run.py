@@ -231,10 +231,10 @@ def run_rec(device="cuda", sim_lambda=0.5):
                         ndcgs.append(0)
         return float(np.mean(ndcgs))
 
-    # 构建2个GRU4Rec模型(不同种子) + 1个SASRec 集成
+    # 构建3个GRU4Rec模型(不同种子) 集成
     all_test_probs = []
 
-    for model_idx, (seed_base, lr) in enumerate([(42, 0.001), (142, 0.001)]):
+    for model_idx, (seed_base, lr) in enumerate([(42, 0.001), (142, 0.001), (242, 0.001)]):
         print(f"\n[GRU4Rec #{model_idx+1}] seed={seed_base}, lr={lr}")
         torch.manual_seed(seed_base); np.random.seed(seed_base)
         model = GRU4RecFullFeatures(
